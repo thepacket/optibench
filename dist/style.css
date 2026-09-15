@@ -2865,3 +2865,8 @@ dialog::backdrop {
 #results-body::-webkit-scrollbar, .workspace::-webkit-scrollbar, .rail::-webkit-scrollbar { width: 12px; height: 12px; }
 #results-body::-webkit-scrollbar-thumb, .workspace::-webkit-scrollbar-thumb, .rail::-webkit-scrollbar-thumb { background: #71859a; border: 3px solid #1e2935; border-radius: 8px; }
 #results-body::-webkit-scrollbar-track, .workspace::-webkit-scrollbar-track, .rail::-webkit-scrollbar-track { background: #1e2935; }
+
+#results-splitter { flex: 0 0 12px; min-height: 12px; display: flex; align-items: center; justify-content: center; cursor: row-resize; touch-action: none; user-select: none; background: #16212c; border-block: 1px solid #435365; }
+#results-splitter span { width: 52px; height: 3px; border-radius: 3px; background: #8c9daf; pointer-events: none; }
+#results-splitter:hover, #results-splitter.dragging, #results-splitter:focus-visible { background: #334b5d; outline: 2px solid var(--lime); outline-offset: -2px; }
+.results-panel:not(.collapsed) { height: var(--results-height, 261px); }
