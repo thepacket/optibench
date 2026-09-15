@@ -240,7 +240,7 @@ function mount() {
       )}</div><div class="results-tools"><select id="detector-select" aria-label="Active detector"></select>${iconButton("export-results", "Export numerical results", "download")}${iconButton("collapse-results", "Collapse or expand results", "chevron")}</div></div><div id="results-body" tabindex="0" role="region" aria-label="Detector and propagation results"></div></section><footer><span id="trace-status"></span><span id="save-state">${saveStatus}</span><span>OptiBench · engine ${ENGINE_VERSION}</span></footer></main><aside class="inspector panel" id="inspector-panel"><div class="panel-title"><h2>Component inspector</h2>${iconButton("close-drawer", "Close inspector", "close", "drawer-close")}</div><div id="inspector-body"></div></aside></div><div id="toast" role="status"></div><div id="drawer-scrim" hidden></div><dialog id="dialog"><div class="dialog-heading"><h2 id="dialog-title"></h2>${iconButton("close-dialog", "Close dialog", "close")}</div><div id="dialog-body"></div></dialog><input hidden id="project-file" type="file" accept=".json,application/json"><input hidden id="catalog-file" type="file" accept=".json,application/json"><input hidden id="image-file" type="file" accept="image/png,image/jpeg,image/webp">`;
   bind();
   bindResultsSplitter({workspace: $(".workspace"), panel: $("#results-panel"), handle: $("#results-splitter"), expand: () => { if (!showResults) { showResults = true; renderResults(); } }});
-  bindWorkspaceLayout({root: $(".app-layout"), workspace: $(".workspace"), panel: $("#results-panel"), expand: () => { if (!showResults) { showResults = true; renderResults(); } }});
+  bindWorkspaceLayout({root: $(".app-layout"), panel: $("#results-panel")});
   compute();
   renderPanels();
   requestAnimationFrame(fit);
@@ -968,6 +968,7 @@ function snapPoint(p) {
   };
 }
 function openDrawer(which) {
+  if (which) $(".app-layout").dispatchEvent(new document.defaultView.CustomEvent("set-panel-open", {detail:{name:which === "library" ? "inventory" : "inspector", open:true}}));
   if (
     (which === "library" && innerWidth >= 920) ||
     (which === "inspector" && innerWidth >= 1280)
@@ -1528,6 +1529,9 @@ function handleClick(e) {
       openDrawer("inspector");
       break;
     case "close-drawer":
+      { const side = e.target.closest(".panel")?.id;
+        if (side) $(".app-layout").dispatchEvent(new document.defaultView.CustomEvent("set-panel-open", {detail:{name:side === "library-panel" ? "inventory" : "inspector",open:false}}));
+      }
       openDrawer("");
       break;
     case "close-dialog":

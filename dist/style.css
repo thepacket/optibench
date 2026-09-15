@@ -2871,10 +2871,6 @@ dialog::backdrop {
 #results-splitter:hover, #results-splitter.dragging, #results-splitter:focus-visible { background: #334b5d; outline: 2px solid var(--lime); outline-offset: -2px; }
 .results-panel:not(.collapsed) { height: var(--results-height, 261px); }
 
-.workspace-layout-tools { display:flex; flex-wrap:wrap; align-items:center; gap:8px; padding:8px 12px; flex-shrink:0; background:#1e2935; border-bottom:1px solid var(--line); }
-.workspace-layout-tools label { display:flex; align-items:center; gap:6px; }
-.workspace-layout-tools button,.workspace-layout-tools select { font-size:14px; padding:6px 8px; border:1px solid #506073; }
-.layout-status { font-size:13px; color:var(--muted); }
 .library,.inspector { position:relative; }
 .side-splitter { position:absolute; top:0; bottom:0; width:8px; z-index:15; cursor:col-resize; touch-action:none; background:#50607333; }
 .inventory-splitter { right:0; }.inspector-splitter { left:0; }
@@ -2883,11 +2879,17 @@ dialog::backdrop {
 @media(min-width:920px) and (max-width:1279px){.app-layout{grid-template-columns:62px var(--inventory-width,260px) minmax(0,1fr);}}
 @media(max-width:1279px){.inspector-splitter{display:none;}}
 @media(max-width:919px){.inventory-splitter{display:none;}}
-.app-layout[data-focus="bench"]>.library,.app-layout[data-focus="bench"]>.inspector,.app-layout[data-focus="detector"]>.library,.app-layout[data-focus="detector"]>.inspector{display:none;}
-.app-layout[data-focus="bench"]>.workspace,.app-layout[data-focus="detector"]>.workspace{grid-column:2/-1;}
-.app-layout[data-focus="bench"] .results-panel,.app-layout[data-focus="bench"] #results-splitter{display:none;}
-.app-layout[data-focus="detector"] .bench-stage,.app-layout[data-focus="detector"] #results-splitter,.app-layout[data-focus="detector"] .workspace-heading,.app-layout[data-focus="detector"] .workbar{display:none;}
-.app-layout[data-focus="detector"] .results-panel{flex:1 1 0;height:auto;min-height:180px;}
-@media(max-width:600px){.workspace-layout-tools{gap:5px;padding:6px}.workspace-layout-tools button,.workspace-layout-tools select{font-size:13px;min-height:32px}.layout-status:empty{display:none;}}
 
 #validation-center pre{white-space:pre-wrap;overflow-wrap:anywhere}#validation-center .validation-card table{width:100%;border-collapse:collapse}#validation-center .validation-card td,#validation-center .validation-card th{padding:10px;text-align:left;border-bottom:1px solid #3b4f61}
+
+/* Collapsed side panels release their full grid column. */
+.library > .panel-title .drawer-close, .inspector > .panel-title .drawer-close { display:inline-flex; }
+.inspector-toggle { display:inline-flex; flex-shrink:0; }
+@media(min-width:1280px){
+  .app-layout>.library{grid-column:2;grid-row:1;}
+  .app-layout>.workspace{grid-column:3;grid-row:1;}
+  .app-layout>.inspector{grid-column:4;grid-row:1;}
+  .app-layout[data-inspector-collapsed="true"]>.inspector{display:none;}
+}
+@media(min-width:920px){.app-layout[data-inventory-collapsed="true"]>.library{display:none;}}
+@media(min-width:920px) and (max-width:1279px){.app-layout>.library{grid-column:2;grid-row:1;}.app-layout>.workspace{grid-column:3;grid-row:1;}}

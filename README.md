@@ -182,11 +182,11 @@ The live comparison tracks visibility, usable area and beam-center separation ag
 
 Save the comparison project or export a Projects-compatible backup with both bench layouts and source acquisitions. Export HTML for a compact metric comparison with exact layouts and settings. Results must be valid before saving, but need not meet the practice targets. Unsaved practice state is lost on reload.
 
-## Adjustable workspace layouts
+## Collapsible side panels
 
-Use the **Workspace** controls above the bench to select Design, Alignment or Measurement. Resize inventory and inspector by dragging their inner edges or using Left/Right arrows on the focused divider. The detector divider still supports dragging and Up/Down keys. **Save layout** stores the current sizes in the selected profile; **Reset layout** restores that profile's defaults. Preferences are local to this browser and separate from optical project data.
+Use the close control in the inventory or component inspector header to collapse that panel completely. Reopen inventory with **Catalog** on the navigation rail and the inspector with **Inspector** beside the bench controls. Expanded panel widths remain adjustable with the inner-edge dividers and are restored when reopened. Collapse state and widths are remembered in this browser. Narrow screens retain the existing drawer behavior.
 
-**Maximize bench** and **Maximize detector** temporarily hide surrounding panels; the same button restores the workspace. At narrow widths, side panels use the existing Catalog/Inspector drawers instead of dividers. Preferred widths are constrained to preserve working space, and controls wrap at small sizes. Maximized mode is temporary and is not restored on reload.
+The workspace profile/maximize toolbar has been removed to recover bench space. The workbench/detector divider remains available.
 
 ## Scientific validation dashboard
 
