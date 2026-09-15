@@ -2820,3 +2820,13 @@ dialog::backdrop {
 .quality-grid span { display: block; color: #a9bfd0; font-size: 12px; margin-top: 5px; }
 .quality-grid p { font-size: 14px; line-height: 1.5; margin-bottom: 0; }
 #measurement-study { border-top: 1px solid #3c4c5c; margin-top: 24px; padding-top: 16px; }
+#validation-center { position:fixed; inset:0; z-index:100; overflow:auto; background:#111923; color:#dfebf5; }
+#validation-center[hidden] {display:none;}
+.validation-main { max-width:1500px; margin:auto; padding:24px; }
+.validation-cards { display:grid; grid-template-columns:repeat(auto-fit,minmax(min(100%,440px),1fr)); gap:18px; }
+.validation-card {padding:20px;border:1px solid #3b4f61;border-radius:8px;margin-bottom:16px;background:#182430;}
+.validation-card header {display:flex;justify-content:space-between;gap:12px;}
+.validation-card p {line-height:1.5;}
+.validation-card a {color:#8dcaff;}
+.validation-card table {width:100%;font-size:14px;}
+.validation-card th,.validation-card td {text-align:left;padding:8px;border-bottom:1px solid #3b4f61;}

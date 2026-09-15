@@ -1,12 +1,12 @@
 {
   "name": "optibench",
-  "version": "0.8.0",
+  "version": "0.9.0",
   "private": true,
   "type": "module",
   "scripts": {
     "test": "node --test tests/*.test.js",
     "start": "python3 -m http.server 5173 --directory dist",
-    "check": "node --check dist/app.js && node --check dist/optics.js && node --check dist/wave.js && node --check dist/catalog.js && node --check dist/interferometry.js && node --check dist/project.js && node --check dist/metrology.js && node --check dist/metrology-ui.js && node --check dist/metrology-worker.js && node --check dist/run-store.js && node --check dist/alignment.js && node --check dist/scientific-images.js && node --check dist/reference-analysis.js && node --check dist/measurement-quality.js && node --check dist/repeatability.js && node --check dist/repeatability-worker.js && node --check dist/uncertainty.js && node --check dist/uncertainty-ui.js"
+    "check": "node --check dist/app.js && node --check dist/optics.js && node --check dist/wave.js && node --check dist/catalog.js && node --check dist/interferometry.js && node --check dist/project.js && node --check dist/metrology.js && node --check dist/metrology-ui.js && node --check dist/metrology-worker.js && node --check dist/run-store.js && node --check dist/alignment.js && node --check dist/scientific-images.js && node --check dist/reference-analysis.js && node --check dist/measurement-quality.js && node --check dist/repeatability.js && node --check dist/repeatability-worker.js && node --check dist/uncertainty.js && node --check dist/uncertainty-ui.js && node --check dist/validation.js && node --check dist/validation-ui.js && node --check dist/validation-worker.js"
   },
   "devDependencies": {
     "happy-dom": "^20.14.5",

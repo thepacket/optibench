@@ -1,3 +1,4 @@
+import { createValidationCenter } from "./validation-ui.js";
 import {
   mountModels,
   mechanicalChecks,
@@ -202,6 +203,7 @@ function mount() {
       ["design", "bolt", "Design"],
       ["analysis", "chart", "Analysis"],
       ["measurements", "camera", "Measure"],
+      ["validation", "info", "Validate"],
       ["bom", "parts", "Parts"],
     ]
       .map(([a, i, t]) => button(a, t, i, a === "bench" ? "active" : ""))
@@ -1479,6 +1481,9 @@ function handleClick(e) {
         "text/csv",
       );
       break;
+    case "validation":
+      validationCenter.open();
+      break;
     case "measurements":
       measurementWorkspace.open();
       break;
@@ -2319,6 +2324,7 @@ try {
         catalog.unshift({ ...valid, id, brand: "Custom", provenance: "ideal" });
     }
 } catch {}
+const validationCenter = createValidationCenter();
 const measurementWorkspace = createMetrologyWorkspace({
   getProject: () => structuredClone(project),
   capture: (method) => {
