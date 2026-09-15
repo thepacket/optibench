@@ -2849,3 +2849,19 @@ dialog::backdrop {
 #guided-workspace table{width:100%;border-collapse:collapse}#guided-workspace td,#guided-workspace th{padding:10px;text-align:left;border-bottom:1px solid #3b4f61}#guided-workspace select{display:block;width:100%;padding:8px}#guided-workspace p{font-size:16px;line-height:1.5}
 
 #practice-workspace{position:fixed;inset:0;z-index:130;overflow:auto;background:#111923;color:#dfebf5}#practice-workspace[hidden]{display:none}.practice-grid{display:grid;grid-template-columns:1fr 1fr;gap:24px}.practice-grid canvas{width:100%;max-width:400px;background:#000;image-rendering:pixelated}.practice-grid label{display:block;margin:12px 0}.practice-grid input,.practice-grid select{display:block;padding:8px;width:100%}#practice-workspace table{width:100%;border-collapse:collapse}#practice-workspace td,#practice-workspace th{padding:10px;border-bottom:1px solid #3b4f61;text-align:left}#practice-workspace p{font-size:16px;line-height:1.5}#practice-workspace .guided-actions{flex-wrap:wrap;gap:10px}@media(max-width:700px){.practice-grid{grid-template-columns:1fr}}
+
+/* Keep tall navigation from pushing detector results below the viewport. */
+.app-layout { grid-template-rows: minmax(0, 1fr); min-height: 0; }
+.rail { min-height: 0; overflow-y: auto; scrollbar-gutter: stable; }
+.rail > button { flex-shrink: 0; }
+.workspace { overflow: auto; scrollbar-gutter: stable; }
+.results-panel { display: flex; flex-direction: column; }
+.results-heading { flex: 0 0 46px; min-width: 0; flex-wrap: nowrap; }
+.result-tabs { min-width: 0; overflow-x: auto; overflow-y: hidden; }
+.result-tabs button { flex-shrink: 0; }
+.results-tools { flex-shrink: 0; }
+#results-body { height: auto; flex: 1 1 0; min-height: 0; overflow: auto; scrollbar-gutter: stable; scrollbar-width: auto; }
+#results-body:focus-visible { outline: 2px solid var(--lime); outline-offset: -2px; }
+#results-body::-webkit-scrollbar, .workspace::-webkit-scrollbar, .rail::-webkit-scrollbar { width: 12px; height: 12px; }
+#results-body::-webkit-scrollbar-thumb, .workspace::-webkit-scrollbar-thumb, .rail::-webkit-scrollbar-thumb { background: #71859a; border: 3px solid #1e2935; border-radius: 8px; }
+#results-body::-webkit-scrollbar-track, .workspace::-webkit-scrollbar-track, .rail::-webkit-scrollbar-track { background: #1e2935; }
