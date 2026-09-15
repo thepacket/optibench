@@ -24,6 +24,7 @@ export function createSimulationWorkspace({
   getProject,
   getDetector,
   onImport,
+  onAlignment,
   store = archiveStore,
 }) {
   let root,
@@ -52,7 +53,7 @@ export function createSimulationWorkspace({
     };
   function render() {
     const p = workingProject || getProject();
-    root.innerHTML = `<header class="measurement-header"><button data-sim="close">← Optical bench</button><h1>Controlled simulation runs</h1><button data-sim="open-file" ${busy ? "disabled" : ""}>Open study / archive</button><button data-sim="current" ${busy ? "disabled" : ""}>Use current bench</button><button data-sim="run" ${busy ? "disabled" : ""}>${busy ? "Simulating…" : "Run sweep"}</button><button data-sim="export" ${study && !busy ? "" : "disabled"}>Export complete study</button><button data-sim="measure" ${study?.rows.some((r) => r.run) && !busy ? "" : "disabled"}>Save acquisitions & measure</button></header><main class="validation-main"><p>Study bench: <b>${esc(p.title)}</b>. Change one parameter across this frozen copy; use “Use current bench” to start from the active layout. Every acquisition retains its modified layout, normalization, seeds and analysis settings.</p><div class="measurement-two"><label>Parameter<select data-config="parameter">${[
+    root.innerHTML = `<header class="measurement-header"><button data-sim="close">← Optical bench</button><h1>Controlled simulation runs</h1><button data-sim="alignment">Alignment & tolerances</button><button data-sim="open-file" ${busy ? "disabled" : ""}>Open study / archive</button><button data-sim="current" ${busy ? "disabled" : ""}>Use current bench</button><button data-sim="run" ${busy ? "disabled" : ""}>${busy ? "Simulating…" : "Run sweep"}</button><button data-sim="export" ${study && !busy ? "" : "disabled"}>Export complete study</button><button data-sim="measure" ${study?.rows.some((r) => r.run) && !busy ? "" : "disabled"}>Save acquisitions & measure</button></header><main class="validation-main"><p>Study bench: <b>${esc(p.title)}</b>. Change one parameter across this frozen copy; use “Use current bench” to start from the active layout. Every acquisition retains its modified layout, normalization, seeds and analysis settings.</p><div class="measurement-two"><label>Parameter<select data-config="parameter">${[
       ["piston", "Mirror piston · nm (absolute)"],
       ["angle", "Mirror angle offset · degrees"],
       ["exposure", "Relative exposure multiplier"],
@@ -143,6 +144,14 @@ export function createSimulationWorkspace({
       }
       if (busy) return;
       try {
+        if (a === "alignment") {
+          onAlignment?.(
+            structuredClone(workingProject || getProject()),
+            config.detectorId,
+            parent?.id || null,
+          );
+          return;
+        }
         if (a === "compare") {
           busy = true;
           comparison = null;

@@ -2835,3 +2835,5 @@ dialog::backdrop {
 #simulation-workspace input,#simulation-workspace select {display:block;width:100%;padding:8px;}
 #simulation-workspace table {width:100%;border-collapse:collapse;}
 #simulation-workspace td,#simulation-workspace th {padding:10px;text-align:left;border-bottom:1px solid #3b4f61;}
+
+#alignment-study-workspace{position:fixed;inset:0;z-index:110;overflow:auto;background:#111923;color:#dfebf5}#alignment-study-workspace[hidden]{display:none}#alignment-study-workspace input,#alignment-study-workspace select{display:block;width:100%;padding:8px}#alignment-study-workspace table{width:100%;border-collapse:collapse}#alignment-study-workspace td,#alignment-study-workspace th{padding:10px;text-align:left;border-bottom:1px solid #3b4f61}

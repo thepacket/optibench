@@ -1,3 +1,4 @@
+import { createAlignmentStudyWorkspace } from "./alignment-study-ui.js";
 import { createSimulationWorkspace } from "./simulation-ui.js";
 import { createValidationCenter } from "./validation-ui.js";
 import {
@@ -2390,7 +2391,21 @@ const measurementWorkspace = createMetrologyWorkspace({
     };
   },
 });
+const alignmentStudyWorkspace = createAlignmentStudyWorkspace({
+  onApply: (base, proposal) => {
+    if (JSON.stringify(project) !== JSON.stringify(base))
+      throw Error(
+        "The active bench differs from this study. Start a new study using the current bench before applying adjustments.",
+      );
+    history.push(snapshot());
+    redo = [];
+    project = validateProject(structuredClone(proposal));
+    commit();
+  },
+});
 const simulationWorkspace = createSimulationWorkspace({
+  onAlignment: (base, detector, revision) =>
+    alignmentStudyWorkspace.open(base, detector, revision),
   getProject: () => structuredClone(project),
   getDetector: () => activeDetector,
   onImport: (records) => measurementWorkspace.importSimulationRuns(records),

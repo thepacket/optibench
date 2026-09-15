@@ -180,3 +180,7 @@ Tests round-trip complete studies, reproduce their values, preserve acquisition 
 ## Saved sweep comparison
 
 Tests reproduce identical saved revisions with zero metric deltas, verify source immutability and revision identity, suppress overlays/deltas for mismatched grids, retain unmatched points from the longer study, identify component edits/additions/removals, escape report labels, and exercise revision selection and stale-export invalidation in an emulated DOM. Comparison uses freshly regenerated results with the sweep archive's existing replay checks. Compatibility checks are explicit constraints on model comparison, not evidence of physical equivalence.
+
+## Alignment search and tolerance studies
+
+Tests exercise a known analytic objective with an optimum at +0.01 degrees, verify search bounds and deterministic uniform trial offsets, retain failed trials in the denominator, reject duplicate axes and locked mirrors, enforce stage travel, and run the real Michelson reconstruction and optimizer. UI tests restore archived inputs without applying a cached proposal. These establish implementation behavior under declared models; they do not validate a physical tolerance distribution, global convergence or manufacturing yield.
