@@ -1,3 +1,5 @@
+import { reopenSimulationStudy, createSweepArchive } from "./sweep-archive.js";
+import { archiveStore } from "./run-store.js";
 import { simulateRuns } from "./simulation-runs.js";
 const esc = (v) =>
   String(v ?? "").replace(
@@ -20,9 +22,18 @@ export function createSimulationWorkspace({
   getProject,
   getDetector,
   onImport,
+  store = archiveStore,
 }) {
   let root,
     study = null,
+    workingProject = null,
+    entries = [],
+    parent = null,
+    title = "",
+    revisionName = "",
+    revisionNotes = "",
+    verification = null,
+    archiveMessage = "",
     busy = false,
     message = "",
     config = {
@@ -35,8 +46,8 @@ export function createSimulationWorkspace({
       detectorId: null,
     };
   function render() {
-    const p = getProject();
-    root.innerHTML = `<header class="measurement-header"><button data-sim="close">← Optical bench</button><h1>Controlled simulation runs</h1><button data-sim="run" ${busy ? "disabled" : ""}>${busy ? "Simulating…" : "Run sweep"}</button><button data-sim="export" ${study && !busy ? "" : "disabled"}>Export complete study</button><button data-sim="measure" ${study?.rows.some((r) => r.run) && !busy ? "" : "disabled"}>Save acquisitions & measure</button></header><main class="validation-main"><p>Change one parameter across a frozen copy of your current bench. Every acquisition retains its modified layout, normalization, seeds and analysis settings.</p><div class="measurement-two"><label>Parameter<select data-config="parameter">${[
+    const p = workingProject || getProject();
+    root.innerHTML = `<header class="measurement-header"><button data-sim="close">← Optical bench</button><h1>Controlled simulation runs</h1><button data-sim="open-file" ${busy ? "disabled" : ""}>Open study / archive</button><button data-sim="current" ${busy ? "disabled" : ""}>Use current bench</button><button data-sim="run" ${busy ? "disabled" : ""}>${busy ? "Simulating…" : "Run sweep"}</button><button data-sim="export" ${study && !busy ? "" : "disabled"}>Export complete study</button><button data-sim="measure" ${study?.rows.some((r) => r.run) && !busy ? "" : "disabled"}>Save acquisitions & measure</button></header><main class="validation-main"><p>Study bench: <b>${esc(p.title)}</b>. Change one parameter across this frozen copy; use “Use current bench” to start from the active layout. Every acquisition retains its modified layout, normalization, seeds and analysis settings.</p><div class="measurement-two"><label>Parameter<select data-config="parameter">${[
       ["piston", "Mirror piston · nm (absolute)"],
       ["angle", "Mirror angle offset · degrees"],
       ["exposure", "Relative exposure multiplier"],
@@ -64,8 +75,34 @@ export function createSimulationWorkspace({
       )
       .join(
         "",
-      )}</select></label>${["start", "end", "count", "seed"].map((key) => `<label>${key}<input data-config="${key}" type="number" step="any" value="${config[key]}"></label>`).join("")}</div><p role="status">${esc(message)}</p><p>128² sample grid. Exposure and noise use an illustrative normalized-intensity readout, not the camera hardware model. Shared seeds isolate parameter effects; these runs are not independent repeats.</p>${study ? `<h2>${esc(study.config.parameter)} comparison</h2>${plot()}<div class="measurement-table-scroll"><table><thead><tr><th>Value</th><th>Status</th><th>Center intensity · frame 0</th><th>Visibility</th><th>PV / RMS · nm</th><th>Error RMS · nm</th><th>Valid area</th></tr></thead><tbody>${study.rows.map((r) => `<tr><td>${fmt(r.value)}</td><td>${esc(r.error || r.status)}</td><td>${fmt(r.intensity)}</td><td>${fmt(r.visibility)}</td><td>${fmt(r.pvNm)} / ${fmt(r.rmsNm)}</td><td>${fmt(r.errorRMSNm)}</td><td>${fmt(r.validFraction == null ? null : r.validFraction * 100)}%</td></tr>${r.warnings?.length ? `<tr><td colspan="7">${r.warnings.map(esc).join(" · ")}</td></tr>` : ""}`).join("")}</tbody></table></div>${study.notes.map((n) => `<p>${esc(n)}</p>`).join("")}` : ""}</main>`;
-    root.onchange = (e) => {
+      )}</select></label>${["start", "end", "count", "seed"].map((key) => `<label>${key}<input data-config="${key}" type="number" step="any" value="${config[key]}"></label>`).join("")}</div><p role="status">${esc(message)}</p><p>128² sample grid. Exposure and noise use an illustrative normalized-intensity readout, not the camera hardware model. Shared seeds isolate parameter effects; these runs are not independent repeats.</p>${study ? `<h2>${esc(study.config.parameter)} comparison</h2>${plot()}<div class="measurement-table-scroll"><table><thead><tr><th>Value</th><th>Status</th><th>Center intensity · frame 0</th><th>Visibility</th><th>PV / RMS · nm</th><th>Error RMS · nm</th><th>Valid area</th></tr></thead><tbody>${study.rows.map((r) => `<tr><td>${fmt(r.value)}</td><td>${esc(r.error || r.status)}</td><td>${fmt(r.intensity)}</td><td>${fmt(r.visibility)}</td><td>${fmt(r.pvNm)} / ${fmt(r.rmsNm)}</td><td>${fmt(r.errorRMSNm)}</td><td>${fmt(r.validFraction == null ? null : r.validFraction * 100)}%</td></tr>${r.warnings?.length ? `<tr><td colspan="7">${r.warnings.map(esc).join(" · ")}</td></tr>` : ""}`).join("")}</tbody></table></div>${study.notes.map((n) => `<p>${esc(n)}</p>`).join("")}` : ""}${historyHTML()}</main><input id="simulation-file" type="file" accept=".json" hidden>`;
+    root.onchange = async (e) => {
+      if (busy) return;
+      if (e.target.id === "simulation-file") {
+        const f = e.target.files?.[0];
+        if (!f) return;
+        busy = true;
+        message = "Opening and recomputing the saved sweep…";
+        render();
+        try {
+          if (f.size > 250 * 1024 * 1024) throw Error("Study exceeds 250 MB.");
+          await restoreFile(JSON.parse(await f.text()));
+        } catch (e) {
+          message = e.message;
+        } finally {
+          busy = false;
+          render();
+        }
+        return;
+      }
+      if (e.target.dataset.revision) {
+        const key = e.target.dataset.revision;
+        if (key === "title") title = e.target.value;
+        if (key === "name") revisionName = e.target.value;
+        if (key === "notes") revisionNotes = e.target.value;
+        return;
+      }
+
       const key = e.target.dataset.config;
       if (!key || busy) return;
       config[key] =
@@ -80,6 +117,7 @@ export function createSimulationWorkspace({
         [config.start, config.end] = defaults;
       }
       study = null;
+      verification = null;
       render();
     };
     root.onclick = async (e) => {
@@ -93,12 +131,67 @@ export function createSimulationWorkspace({
       }
       if (busy) return;
       try {
+        if (a === "open-file") {
+          root.querySelector("#simulation-file").click();
+          return;
+        }
+        if (a === "current") {
+          workingProject = structuredClone(getProject());
+          study = null;
+          verification = null;
+          parent = null;
+          title = "";
+          revisionName = "";
+          revisionNotes = "";
+          config.detectorId =
+            getDetector() ||
+            workingProject.items.find((c) =>
+              ["camera", "screen", "power"].includes(c.type),
+            )?.id;
+          config.mirrorId = workingProject.items.find(
+            (c) => c.type === "mirror",
+          )?.id;
+          message = "Frozen study bench replaced with the active layout.";
+          return;
+        }
+        if (a === "save-revision") {
+          if (!study) throw Error("Run or reopen a study before archiving.");
+          const archived = createSweepArchive(study, {
+            title,
+            revisionName,
+            revisionNotes,
+            parent,
+          });
+          await store.save(archived);
+          parent = archived;
+          title = archived.title;
+          revisionName = "";
+          revisionNotes = "";
+          message = "Complete sweep saved as an immutable revision.";
+          await refresh();
+          return;
+        }
+        if (a === "open-revision") {
+          busy = true;
+          message = "Recomputing archived sweep…";
+          render();
+          await restoreFile(entries.find((a) => a.id === b.dataset.id));
+          return;
+        }
+        if (a === "export-revision") {
+          download(
+            "optibench-sweep-archive.json",
+            JSON.stringify(entries.find((a) => a.id === b.dataset.id)),
+          );
+          return;
+        }
         if (a === "run") {
           busy = true;
           study = null;
           message = "Tracing the frozen bench and reconstructing phase frames…";
           render();
-          const project = structuredClone(getProject());
+          verification = null;
+          const project = structuredClone(workingProject || getProject());
           if (typeof Worker === "undefined")
             study = simulateRuns(project, config);
           else {
@@ -132,6 +225,49 @@ export function createSimulationWorkspace({
       }
     };
   }
+  async function refresh() {
+    try {
+      entries = (await store.list())
+        .filter((a) => a.format === "optibench-sweep-archive")
+        .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+    } catch (e) {
+      archiveMessage = e.message;
+    }
+    if (root) render();
+  }
+  async function restoreFile(input) {
+    let restored;
+    if (typeof Worker === "undefined") restored = reopenSimulationStudy(input);
+    else {
+      const w = new Worker(new URL("./simulation-worker.js", import.meta.url), {
+        type: "module",
+      });
+      try {
+        restored = await new Promise((resolve, reject) => {
+          w.onmessage = ({ data }) =>
+            data.error ? reject(Error(data.error)) : resolve(data.result);
+          w.onerror = () => reject(Error("Sweep reopening worker failed."));
+          w.postMessage({ operation: "reopen", input });
+        });
+      } finally {
+        w.terminate();
+      }
+    }
+    study = restored.study;
+    workingProject = structuredClone(study.baseProject);
+    config = { ...study.config };
+    verification = restored;
+    parent = restored.archive;
+    title = parent?.title || "Reopened simulation study";
+    revisionName = "";
+    revisionNotes = "";
+    message =
+      restored.summary +
+      ". The active bench is unchanged; the controls use the saved study bench.";
+  }
+  function historyHTML() {
+    return `<section class="validation-card"><h2>Complete sweep archive</h2><p>${esc(archiveMessage)}</p><p>All points, including failures, are stored in one revision. These are synthetic simulation records. Export JSON for backup; revisions are local to this browser.</p><div class="measurement-two"><label>Experiment title<input data-revision="title" value="${esc(title)}" maxlength="120"></label><label>Revision name<input data-revision="name" value="${esc(revisionName)}" maxlength="120"></label></div><label>Revision notes<textarea data-revision="notes" maxlength="10000">${esc(revisionNotes)}</textarea></label><p>${parent ? "Next revision branches from " + esc(parent.revisionName) : "New sweep history"}</p><button data-sim="save-revision" ${study && !busy ? "" : "disabled"}>Save entire sweep revision</button>${verification ? `<h3>${esc(verification.summary)}</h3><p>Frame tolerance 10⁻¹² normalized intensity; map and scalar tolerance 10⁻⁷; mask and status must agree. Recomputed results are shown; saved revisions are not changed.</p><ul>${verification.checks.map((c) => `<li>Point ${c.index + 1} (${fmt(c.value)}): ${esc(c.status)} · ${esc(c.savedStatus)} → ${esc(c.recomputedStatus)}${c.savedError ? ` · archived: ${esc(c.savedError)}` : ""}</li>`).join("")}</ul>` : ""}<div class="measurement-table-scroll"><table><thead><tr><th>Experiment / revision</th><th>Saved</th><th>Points / failures</th><th>Notes</th><th>Actions</th></tr></thead><tbody>${entries.map((a) => `<tr><td>${esc(a.title)}<small>${esc(a.revisionName)}</small></td><td>${esc(a.createdAt)}</td><td>${a.study.rows.length} / ${a.study.rows.filter((r) => r.status === "failed").length}</td><td>${esc(a.revisionNotes)}</td><td><button data-sim="open-revision" data-id="${esc(a.id)}">Open & recompute</button><button data-sim="export-revision" data-id="${esc(a.id)}">Export</button></td></tr>`).join("")}</tbody></table></div></section>`;
+  }
   function plot() {
     const good = study.rows.filter((r) => Number.isFinite(r.intensity));
     if (!good.length) return "";
@@ -153,16 +289,15 @@ export function createSimulationWorkspace({
   }
   return {
     open() {
-      const p = getProject();
-      if (study) {
-        study = null;
-        message =
-          "Bench refreshed. Run a new sweep; previously saved acquisitions remain in Measure.";
+      if (!workingProject) {
+        workingProject = structuredClone(getProject());
+        const p = workingProject;
+        config.detectorId =
+          getDetector() ||
+          p.items.find((c) => ["camera", "screen", "power"].includes(c.type))
+            ?.id;
+        config.mirrorId = p.items.find((c) => c.type === "mirror")?.id;
       }
-      config.detectorId =
-        getDetector() ||
-        p.items.find((c) => ["camera", "screen", "power"].includes(c.type))?.id;
-      config.mirrorId = p.items.find((c) => c.type === "mirror")?.id;
       if (!root) {
         root = document.createElement("section");
         root.id = "simulation-workspace";
@@ -171,6 +306,7 @@ export function createSimulationWorkspace({
       root.hidden = false;
       document.querySelector("#app").inert = true;
       render();
+      refresh();
     },
   };
 }

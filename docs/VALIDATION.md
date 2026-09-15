@@ -170,3 +170,9 @@ Tests round-trip the guided experiment through JSON, reproduce its eleven compar
 ## Controlled simulation sweep validation
 
 Tests verify that a Michelson arm piston completes an intensity cycle after λ/2 and changes intensity at λ/4, that sweeping does not mutate the base bench, and that each acquisition retains its exact modified mirror position and common normalization. Separate tests verify deterministic seeded frame noise, a 2× exposure response after subtracting the fixed 0.02 offset, rejection of different sweep conditions as repeat acquisitions, and transfer from the simulation UI into the measurement workflow. These exercise the supported normalized readout and ideal two-arm model; they do not validate a physical camera.
+
+## Entire-sweep archive checks
+
+Simulation-study and sweep-archive schemas validate row counts, point ordering, unique successful acquisition IDs, bench schemas and 128² four-frame source samples before reconstruction. Reopening regenerates all cases from the stored base bench/configuration and compares frames, retained masks, height maps, scalar summaries, bench snapshots and failure status. It uses the fresh results in the workspace while retaining saved revision data unchanged.
+
+Tests round-trip complete studies, reproduce their values, preserve acquisition identities and parent revision links, identify modified frames/maps and historical failure transitions, reject incomplete studies, and reopen a Michelson archive while the active bench remains an expander. UI tests also save a new revision, retain controls across closing/reopening, and explicitly reset to the active bench. All tests run in the GitHub workflow.

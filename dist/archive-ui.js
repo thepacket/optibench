@@ -30,9 +30,9 @@ export function createArchivePanel({
     busy = false;
   async function refresh() {
     try {
-      entries = (await store.list()).sort((a, b) =>
-        b.createdAt.localeCompare(a.createdAt),
-      );
+      entries = (await store.list())
+        .filter((a) => a.format === "optibench-experiment")
+        .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
       if (root) render(root);
     } catch (e) {
       message = e.message;
