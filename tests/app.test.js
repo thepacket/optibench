@@ -17,8 +17,10 @@ for (const key of [
 ])
   globalThis[key] = window[key];
 globalThis.innerWidth = 1440;
+let resizeBench;
 globalThis.ResizeObserver = class {
-  observe() {}
+  constructor(callback) { this.callback = callback; }
+  observe(target) { if (target.id === "stage") resizeBench = this.callback; }
 };
 globalThis.requestAnimationFrame = (callback) => {
   queueMicrotask(callback);
@@ -336,4 +338,30 @@ test("alignment instruments synchronize height edits, fine stages, side projecti
     JSON.parse(localStorage.getItem("optibench-lab-v2")).items[4].z,
     130,
   );
+});
+
+
+test("table scales with panel height while preserving zoom and centre", () => {
+  const stage = el('#stage');
+  let height = 300;
+  Object.defineProperty(stage, 'clientWidth', { configurable: true, value: 1000 });
+  Object.defineProperty(stage, 'clientHeight', { configurable: true, get: () => height });
+  el('[data-action="fit"]').click();
+  const box = () => el('#bench').getAttribute('viewBox').split(' ').map(Number);
+  const before = box();
+  height = 600;
+  resizeBench();
+  const after = box();
+  assert.ok(1000 / after[2] > 1000 / before[2], 'table should grow with available height');
+  assert.ok(Math.abs(after[2] / after[3] - 1000 / 600) < 1e-9);
+  assert.ok(Math.abs(after[0] + after[2] / 2 - before[0] - before[2] / 2) < 1e-9);
+  click('[data-action="zoom-in"]');
+  const zoomed = box();
+  height = 300;
+  resizeBench();
+  const smaller = box();
+  assert.ok(Math.abs(smaller[2] / before[2] - zoomed[2] / after[2]) < 1e-9);
+  delete stage.clientWidth;
+  delete stage.clientHeight;
+  click('[data-action="fit"]');
 });

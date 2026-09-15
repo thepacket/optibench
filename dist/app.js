@@ -1258,7 +1258,24 @@ function bind() {
       commit();
     }
   });
-  new ResizeObserver(() => drawBench()).observe($("#stage"));
+  new ResizeObserver(() => {
+    const stage = $("#stage");
+    if (!stage.clientWidth || !stage.clientHeight) return;
+    const ratio = stage.clientWidth / stage.clientHeight;
+    const tableWidth = project.table.width + 120;
+    const tableHeight = project.table.height + 120;
+    // Keep the user's zoom relative to Fit while adapting to the new panel shape.
+    const zoom = view.w / Math.max(tableWidth, tableHeight * view.w / view.h);
+    const width = Math.max(tableWidth, tableHeight * ratio) * zoom;
+    const height = width / ratio;
+    view = {
+      x: view.x + (view.w - width) / 2,
+      y: view.y + (view.h - height) / 2,
+      w: width,
+      h: height,
+    };
+    drawBench();
+  }).observe($("#stage"));
   $("#project-file").onchange = async (e) => {
     const f = e.target.files[0];
     if (!f) return;
