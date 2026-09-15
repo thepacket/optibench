@@ -1,3 +1,10 @@
+import { decodeTIFF, decodeNumericalImage } from "./scientific-images.js";
+import {
+  subtractReference,
+  estimateTranslation,
+  crossSection,
+  differenceCSV,
+} from "./reference-analysis.js";
 import {
   defaultMeasurementSettings,
   analyzeMeasurement,
@@ -49,7 +56,11 @@ export function createMetrologyWorkspace({
     job = 0,
     sourceProject = null,
     view = "height",
-    worker = null;
+    worker = null,
+    reference = null,
+    difference = null,
+    registration = { dx: 0, dy: 0, verified: false },
+    profile = { axis: "horizontal", index: 0, source: "sample" };
   const $ = (s) => root.querySelector(s);
   function status(text) {
     message = text;
@@ -57,6 +68,8 @@ export function createMetrologyWorkspace({
   }
   function invalidate() {
     result = null;
+    difference = null;
+    registration.verified = false;
     job++;
   }
   async function refreshRuns() {
@@ -64,7 +77,10 @@ export function createMetrologyWorkspace({
       runs = (await store.list()).sort((a, b) =>
         b.createdAt.localeCompare(a.createdAt),
       );
-      if (root) renderRuns();
+      if (root) {
+        renderRuns();
+        renderAdvanced();
+      }
     } catch (e) {
       status(e.message);
     }
@@ -86,8 +102,9 @@ export function createMetrologyWorkspace({
     refreshRuns();
   }
   function render() {
-    root.innerHTML = `<header class="measurement-header"><button data-measure="close">← Optical bench</button><div><span class="measurement-kicker">OPTIBENCH / METROLOGY</span><h1>Fringe measurements</h1></div><button data-measure="import-run">Open run JSON</button><button data-measure="export-run" ${result ? "" : "disabled"}>Export run</button><button data-measure="save" class="measurement-primary" ${result ? "" : "disabled"}>Save experiment</button></header><div class="measurement-grid"><aside class="measurement-controls"><section><h2>1. Image source</h2><label>Reconstruction<select data-setting="method"><option value="four-step" ${settings.method === "four-step" ? "selected" : ""}>Four frames · 0°, 90°, 180°, 270°</option><option value="fourier" ${settings.method === "fourier" ? "selected" : ""}>Single image · Fourier sideband</option></select></label><div class="measurement-buttons"><button data-measure="import-frames">Import ${settings.method === "four-step" ? "4 frames" : "image"}</button><button data-measure="capture">Capture simulation</button><button data-measure="demo">Load example</button></div><p class="measurement-help">PNG, JPEG or WebP · 64–2048 px per side. Decoded 8-bit luminance; use linear monochrome exports without display gamma. No resizing is applied.</p><div class="measurement-frame-list">${frames.length ? frames.map((f, i) => `<div><b>${settings.method === "four-step" ? i * 90 + "°" : "Frame"}</b><span title="${esc(f.name)}">${esc(f.name)}<small>${f.width} × ${f.height} · ${esc(f.origin)}</small></span>${i ? `<button data-measure="frame-up" data-index="${i}" aria-label="Move frame earlier">↑</button>` : ""}</div>`).join("") : '<p class="measurement-help">No frames loaded. Import laboratory images or try the example.</p>'}</div><div class="measurement-buttons"><button data-measure="dark">${dark ? "Replace" : "Add"} dark</button><button data-measure="flat">${flat ? "Replace" : "Add"} flat</button>${dark || flat ? '<button data-measure="clear-calibration">Clear calibration</button>' : ""}</div><p class="measurement-help">${dark ? "Dark: " + esc(dark.name) : "No dark subtraction"}<br>${flat ? "Flat: " + esc(flat.name) : "No flat-field correction"}</p></section><section><h2>2. ROI & calibration</h2><label>Square ROI size<select data-setting="n">${[64, 128, 256, 512].map((n) => `<option ${n === settings.n ? "selected" : ""}>${n}</option>`).join("")}</select></label><div class="measurement-two">${numberField("Origin X · px", "x", settings.x, 0, 2047, 1)}${numberField("Origin Y · px", "y", settings.y, 0, 2047, 1)}</div>${numberField("Object-plane scale · µm / pixel", "pixelUm", settings.pixelUm, 0.000001, 100000)}${numberField("Wavelength · nm", "wavelength", settings.wavelength, 200, 20000)}<label>Conversion<select data-setting="geometry"><option value="opd" ${settings.geometry === "opd" ? "selected" : ""}>Optical path difference</option><option value="reflection" ${settings.geometry === "reflection" ? "selected" : ""}>Reflecting-surface height</option></select></label>${settings.geometry === "reflection" ? numberField("Incidence from surface normal · °", "incidence", settings.incidence, 0, 80) : ""}${numberField("Minimum visibility · 0–1", "minVisibility", settings.minVisibility, 0.01, 0.95, 0.01)}<label class="measurement-check"><input data-setting="removeTilt" type="checkbox" ${settings.removeTilt ? "checked" : ""}>Remove fitted tilt and piston</label><p class="measurement-help">${settings.removeTilt ? "Best-fit plane removed." : "Only mean phase removed."} Heights and OPD are relative; absolute fringe order is unknown.</p>${settings.method === "fourier" ? `<label class="measurement-check"><input data-setting="autoCarrier" type="checkbox" ${settings.autoCarrier ? "checked" : ""}>Find carrier automatically</label><div class="measurement-two">${numberField("Carrier X · bins", "carrierX", settings.carrierX, -256, 256)}${numberField("Carrier Y · bins", "carrierY", settings.carrierY, -256, 256)}</div>${numberField("Sideband radius · bins", "bandwidth", settings.bandwidth, 1, 32)}<p class="measurement-help">Manual signed carrier bins select the conjugate sideband and phase sign. A circular tapered filter must separate the sideband from DC.</p>` : ""}<button class="measurement-primary measurement-analyze" data-measure="analyze" ${busy ? "disabled" : ""}>${busy ? "Reconstructing…" : "Reconstruct phase"}</button></section></aside><main class="measurement-main"><div class="measurement-title"><label>Experiment name<input id="measurement-name" value="${esc(name)}" maxlength="120"></label><span class="measurement-badge">${frames.length ? esc(frames[0].origin) : "Awaiting image data"}</span></div><div class="measurement-status" id="measurement-status" role="status">${esc(message || "Import images, select a region and reconstruct phase.")}</div><div class="measurement-instruments"><article><header><h2>Input & region</h2><span>${frames[0] ? frames[0].width + " × " + frames[0].height + " px" : "—"}</span></header><canvas id="measurement-input" aria-label="Input fringe image and selected ROI"></canvas><p>ROI: (${settings.x}, ${settings.y}) · ${settings.n}² native pixels · ${fmt((settings.n * settings.pixelUm) / 1000, 3)} mm wide</p></article><article><header><h2>Reconstruction</h2><select id="measurement-view" aria-label="Map display">${[
+    root.innerHTML = `<header class="measurement-header"><button data-measure="close">← Optical bench</button><div><span class="measurement-kicker">OPTIBENCH / METROLOGY</span><h1>Fringe measurements</h1></div><button data-measure="import-run">Open run JSON</button><button data-measure="export-run" ${result ? "" : "disabled"}>Export run</button><button data-measure="save" class="measurement-primary" ${result ? "" : "disabled"}>Save experiment</button></header><div class="measurement-grid"><aside class="measurement-controls"><section><h2>1. Image source</h2><label>Reconstruction<select data-setting="method"><option value="four-step" ${settings.method === "four-step" ? "selected" : ""}>Four frames · 0°, 90°, 180°, 270°</option><option value="fourier" ${settings.method === "fourier" ? "selected" : ""}>Single image · Fourier sideband</option></select></label><div class="measurement-buttons"><button data-measure="import-frames">Import ${settings.method === "four-step" ? "4 frames" : "image"}</button><button data-measure="capture">Capture simulation</button><button data-measure="demo">Load example</button></div><p class="measurement-help">TIFF · unsigned monochrome 8/16-bit; numerical JSON · full-precision samples. PNG/JPEG/WebP · decoded 8-bit luminance. 64–2048 px per side, no resizing. Use linear intensity. <button data-measure="image-template">Numerical JSON template</button></p><div class="measurement-frame-list">${frames.length ? frames.map((f, i) => `<div><b>${settings.method === "four-step" ? i * 90 + "°" : "Frame"}</b><span title="${esc(f.name)}">${esc(f.name)}<small>${f.width} × ${f.height} · ${esc(f.origin)} · ${esc(f.precision || "normalized intensity")}</small></span>${i ? `<button data-measure="frame-up" data-index="${i}" aria-label="Move frame earlier">↑</button>` : ""}</div>`).join("") : '<p class="measurement-help">No frames loaded. Import laboratory images or try the example.</p>'}</div><div class="measurement-buttons"><button data-measure="dark">${dark ? "Replace" : "Add"} dark</button><button data-measure="flat">${flat ? "Replace" : "Add"} flat</button>${dark || flat ? '<button data-measure="clear-calibration">Clear calibration</button>' : ""}</div><p class="measurement-help">${dark ? "Dark: " + esc(dark.name) : "No dark subtraction"}<br>${flat ? "Flat: " + esc(flat.name) : "No flat-field correction"}</p></section><section><h2>2. ROI & calibration</h2><label>Square ROI size<select data-setting="n">${[64, 128, 256, 512].map((n) => `<option ${n === settings.n ? "selected" : ""}>${n}</option>`).join("")}</select></label><div class="measurement-two">${numberField("Origin X · px", "x", settings.x, 0, 2047, 1)}${numberField("Origin Y · px", "y", settings.y, 0, 2047, 1)}</div>${numberField("Object-plane scale · µm / pixel", "pixelUm", settings.pixelUm, 0.000001, 100000)}${numberField("Wavelength · nm", "wavelength", settings.wavelength, 200, 20000)}<label>Conversion<select data-setting="geometry"><option value="opd" ${settings.geometry === "opd" ? "selected" : ""}>Optical path difference</option><option value="reflection" ${settings.geometry === "reflection" ? "selected" : ""}>Reflecting-surface height</option></select></label>${settings.geometry === "reflection" ? numberField("Incidence from surface normal · °", "incidence", settings.incidence, 0, 80) : ""}${numberField("Minimum visibility · 0–1", "minVisibility", settings.minVisibility, 0.01, 0.95, 0.01)}<label class="measurement-check"><input data-setting="removeTilt" type="checkbox" ${settings.removeTilt ? "checked" : ""}>Remove fitted tilt and piston</label><p class="measurement-help">${settings.removeTilt ? "Best-fit plane removed." : "Only mean phase removed."} Heights and OPD are relative; absolute fringe order is unknown.</p>${settings.method === "fourier" ? `<label class="measurement-check"><input data-setting="autoCarrier" type="checkbox" ${settings.autoCarrier ? "checked" : ""}>Find carrier automatically</label><div class="measurement-two">${numberField("Carrier X · bins", "carrierX", settings.carrierX, -256, 256)}${numberField("Carrier Y · bins", "carrierY", settings.carrierY, -256, 256)}</div>${numberField("Sideband radius · bins", "bandwidth", settings.bandwidth, 1, 32)}<p class="measurement-help">Manual signed carrier bins select the conjugate sideband and phase sign. A circular tapered filter must separate the sideband from DC.</p>` : ""}<button class="measurement-primary measurement-analyze" data-measure="analyze" ${busy ? "disabled" : ""}>${busy ? "Reconstructing…" : "Reconstruct phase"}</button></section></aside><main class="measurement-main"><div class="measurement-title"><label>Experiment name<input id="measurement-name" value="${esc(name)}" maxlength="120"></label><span class="measurement-badge">${frames.length ? esc(frames[0].origin) : "Awaiting image data"}</span></div><div class="measurement-status" id="measurement-status" role="status">${esc(message || "Import images, select a region and reconstruct phase.")}</div><div class="measurement-instruments"><article><header><h2>Input & region</h2><span>${frames[0] ? frames[0].width + " × " + frames[0].height + " px" : "—"}</span></header><canvas id="measurement-input" aria-label="Input fringe image and selected ROI"></canvas><p>ROI: (${settings.x}, ${settings.y}) · ${settings.n}² native pixels · ${fmt((settings.n * settings.pixelUm) / 1000, 3)} mm wide</p></article><article><header><h2>Reconstruction</h2><select id="measurement-view" aria-label="Map display">${[
       ["height", "Relative nm"],
+      ["difference", "Sample − reference nm"],
       ["phase", "Unwrapped rad"],
       ["wrapped", "Wrapped rad"],
       ["visibility", "Visibility"],
@@ -99,8 +116,9 @@ export function createMetrologyWorkspace({
       )
       .join(
         "",
-      )}</select></header><canvas id="measurement-map" aria-label="Reconstructed phase or height map"></canvas><p id="measurement-map-scale">${result ? "" : "No result yet. Invalid pixels appear dark."}</p></article></div><div id="measurement-results"></div><label class="measurement-notes">Experiment notes<textarea id="measurement-notes" rows="3" placeholder="Sample, camera settings, calibration references and observations…">${esc(notes)}</textarea></label><section class="measurement-records"><header><h2>Saved experiments</h2><span>Stored on this browser · export JSON for backup</span></header><div id="measurement-runs"></div></section><details class="measurement-model"><summary>Methods, calibration and interpretation</summary><p>Four-step reconstruction assumes registered linear-intensity frames I(φ + δ), δ = 0°, 90°, 180°, 270°, with unchanged exposure. Phase is atan2(I270 − I90, I0 − I180). Dark is subtracted before optional division by flat − dark. A flat should be an unfringed illumination reference acquired at compatible settings.</p><p>Single-image analysis applies a Hann window and isolates a tapered Fourier sideband. The positive-half-plane automatic choice defines a sign convention; physical sign requires a known reference. Filtering limits spatial resolution. The outer 10% of the ROI is excluded. Adjust the sideband and check stability of the reconstruction.</p><p>Quality-guided unwrapping assumes adjacent valid phase differences below π. Only the strongest connected region is retained. Discontinuities and inconsistent edges can invalidate heights. OPD = λφ/(2π); reflecting height = λφ/(4π cos θ). Pixel scale must be calibrated at the sample plane. Reported PV and RMS describe the retained region after the selected plane removal; they are not uncertainty bounds.</p><p>Browser-decoded images are 8-bit luminance, not sensor RAW. Keep original camera files separately. Saved runs contain the exact decoded samples used, calibration frames, settings, bench snapshot and results. Files remain local; no acquisition hardware is connected.</p><p><a href="https://opg.optica.org/josa/abstract.cfm?uri=josa-72-1-156" target="_blank" rel="noopener">Takeda et al. · Fourier fringe analysis</a> · <a href="https://arxiv.org/abs/1501.04738" target="_blank" rel="noopener">Four-step phase calibration</a></p></details></main></div><input id="measurement-files" type="file" accept="image/png,image/jpeg,image/webp" hidden multiple><input id="measurement-calibration" type="file" accept="image/png,image/jpeg,image/webp" hidden><input id="measurement-run-file" type="file" accept="application/json,.json" hidden>`;
+      )}</select></header><canvas id="measurement-map" aria-label="Reconstructed phase or height map"></canvas><p id="measurement-map-scale">${result ? "" : "No result yet. Invalid pixels appear dark."}</p></article></div><div id="measurement-results"></div><div id="measurement-advanced"></div><label class="measurement-notes">Experiment notes<textarea id="measurement-notes" rows="3" placeholder="Sample, camera settings, calibration references and observations…">${esc(notes)}</textarea></label><section class="measurement-records"><header><h2>Saved experiments</h2><span>Stored on this browser · export JSON for backup</span></header><div id="measurement-runs"></div></section><details class="measurement-model"><summary>Methods, calibration and interpretation</summary><p>Four-step reconstruction assumes registered linear-intensity frames I(φ + δ), δ = 0°, 90°, 180°, 270°, with unchanged exposure. Phase is atan2(I270 − I90, I0 − I180). Dark is subtracted before optional division by flat − dark. A flat should be an unfringed illumination reference acquired at compatible settings.</p><p>Single-image analysis applies a Hann window and isolates a tapered Fourier sideband. The positive-half-plane automatic choice defines a sign convention; physical sign requires a known reference. Filtering limits spatial resolution. The outer 10% of the ROI is excluded. Adjust the sideband and check stability of the reconstruction.</p><p>Quality-guided unwrapping assumes adjacent valid phase differences below π. Only the strongest connected region is retained. Discontinuities and inconsistent edges can invalidate heights. OPD = λφ/(2π); reflecting height = λφ/(4π cos θ). Pixel scale must be calibrated at the sample plane. Reported PV and RMS describe the retained region after the selected plane removal; they are not uncertainty bounds.</p><p>PNG/JPEG/WebP are browser-decoded 8-bit luminance. TIFF preserves unsigned 8/16-bit monochrome samples (single-page strips, top-left orientation; uncompressed, LZW, PackBits or Deflate). Numerical JSON contains width, height, fullScale and flat row-major values. Neither path interprets sensor RAW. Reference subtraction uses translation only, bilinear interpolation and the valid-mask intersection; it removes the common mean. Rotation, distortion and absolute piston are not recovered. Keep original camera files separately. Saved runs contain the exact decoded samples used, calibration frames, settings, bench snapshot and results. Files remain local; no acquisition hardware is connected.</p><p><a href="https://opg.optica.org/josa/abstract.cfm?uri=josa-72-1-156" target="_blank" rel="noopener">Takeda et al. · Fourier fringe analysis</a> · <a href="https://arxiv.org/abs/1501.04738" target="_blank" rel="noopener">Four-step phase calibration</a></p></details></main></div><input id="measurement-files" type="file" accept="image/png,image/jpeg,image/webp,image/tiff,.tif,.tiff,.json" hidden multiple><input id="measurement-calibration" type="file" accept="image/png,image/jpeg,image/webp,image/tiff,.tif,.tiff,.json" hidden><input id="measurement-run-file" type="file" accept="application/json,.json" hidden>`;
     renderResults();
+    renderAdvanced();
     renderRuns();
     paintInput();
   }
@@ -127,6 +145,84 @@ export function createMetrologyWorkspace({
       $("#measurement-comparison").innerHTML =
         `<p><b>${esc(a.name)} − ${esc(b.name)}</b>: ΔPV ${fmt(a.result.stats.pvNm - b.result.stats.pvNm)} nm · ΔRMS ${fmt(a.result.stats.rmsNm - b.result.stats.rmsNm)} nm.</p><p>${compatible ? "Same analysis settings; confirm matching samples and image registration before interpreting differences." : "Different analysis settings. This is a summary comparison; values are not directly interchangeable."}</p>`;
     }
+  }
+  function referenceRecord(r) {
+    if (!r?.frames || !r.settings)
+      throw Error("Choose a saved reference experiment.");
+    const { reference: nested, comparison, ...plain } = r;
+    return serializable(plain);
+  }
+  function referenceResult() {
+    if (!reference) throw Error("Choose a saved reference experiment.");
+    return analyzeMeasurement(reference.frames, reference.settings, {
+      dark: reference.dark,
+      flat: reference.flat,
+    });
+  }
+  function applyReference() {
+    difference = subtractReference(result, referenceResult(), registration);
+  }
+  function profileData() {
+    const source = profile.source === "difference" ? difference : result;
+    return source
+      ? crossSection(source, {
+          ...profile,
+          index: Math.min(profile.index, source.n - 1),
+          pixelUm: settings.pixelUm,
+        })
+      : [];
+  }
+  function profileCSV() {
+    return (
+      "x_roi_pixel,y_roi_pixel,position_um,value_nm,valid\n" +
+      profileData()
+        .map((p) =>
+          [
+            p.x,
+            p.y,
+            p.positionUm,
+            p.value ?? "",
+            p.value === null ? 0 : 1,
+          ].join(","),
+        )
+        .join("\n")
+    );
+  }
+  function profileSVG() {
+    const points = profileData(),
+      valid = points.filter((p) => p.value !== null);
+    if (!valid.length)
+      return "<p>No valid profile data for this selection.</p>";
+    const lo = Math.min(...valid.map((p) => p.value)),
+      hi = Math.max(...valid.map((p) => p.value));
+    let path = "",
+      connected = false;
+    points.forEach((p, i) => {
+      if (p.value === null) {
+        connected = false;
+        return;
+      }
+      path +=
+        (connected ? " L" : " M") +
+        (50 + (i / (points.length - 1)) * 620).toFixed(2) +
+        "," +
+        (170 - ((p.value - lo) / (hi - lo || 1)) * 140).toFixed(2);
+      connected = true;
+    });
+    return `<svg viewBox="0 0 720 220" role="img" aria-label="${esc(profile.source)} ${esc(profile.axis)} cross-section in nanometres" style="width:100%;background:#101923;color:#bcd1e0"><path d="M50 20V180H680" stroke="#789" fill="none"/><path d="${path}" stroke="#bdf18b" stroke-width="2" fill="none"/><g fill="currentColor" font-size="12"><text x="5" y="25">${fmt(hi)} nm</text><text x="5" y="174">${fmt(lo)}</text><text x="50" y="204">${fmt(points[0].positionUm)} µm</text><text x="570" y="204">${fmt(points.at(-1).positionUm)} µm</text></g></svg><p>${esc(profile.source)} · ${esc(profile.axis)} ${profile.index} · ${valid.length}/${points.length} valid pixels. Distance from ROI origin; gaps are excluded pixels.</p>`;
+  }
+  function referenceReport() {
+    return difference
+      ? `<h2>Sample − reference</h2><p>Reference: ${esc(reference.name)} (${esc(reference.id)}). Translation: (${registration.dx}, ${registration.dy}) px; registration and phase sign verified by operator. Bilinear interpolation, valid overlap ${fmt(difference.stats.validFraction * 100)}%. PV ${fmt(difference.stats.pvNm)} nm; RMS ${fmt(difference.stats.rmsNm)} nm. Common mean removed: ${fmt(difference.removedMeanNm)} nm.</p>`
+      : "";
+  }
+  function renderAdvanced() {
+    const target = $("#measurement-advanced");
+    if (!target) return;
+    const choices = [...runs];
+    if (reference && !choices.some((r) => r.id === reference.id))
+      choices.push(reference);
+    target.innerHTML = `<section class="measurement-records"><h2>Reference wavefront</h2><label>Saved reference<select id="measurement-reference"><option value="">Choose reference…</option>${choices.map((r) => `<option value="${esc(r.id)}" ${reference?.id === r.id ? "selected" : ""}>${esc(r.name)} · ${esc(r.createdAt)}</option>`).join("")}</select></label><div class="measurement-two"><label>Reference X offset · px<input data-registration="dx" type="number" step="0.1" value="${registration.dx}"></label><label>Reference Y offset · px<input data-registration="dy" type="number" step="0.1" value="${registration.dy}"></label></div><p class="measurement-help">Reference is sampled at (sample X + offset X, sample Y + offset Y). Translation only; confirm matching scale, orientation, sample features and physical phase sign. Correlation can be ambiguous for periodic fringes.</p><label class="measurement-check"><input data-registration="verified" type="checkbox" ${registration.verified ? "checked" : ""}>I verified registration and phase sign</label><div class="measurement-buttons"><button data-measure="estimate-reference" ${result && reference ? "" : "disabled"}>Estimate translation</button><button data-measure="apply-reference" ${result && reference && registration.verified ? "" : "disabled"}>Subtract reference</button><button data-measure="difference-csv" ${difference ? "" : "disabled"}>Export difference CSV</button></div>${referenceReport()}</section><section class="measurement-records"><h2>Cross-section</h2><div class="measurement-two"><label>Source<select data-profile="source"><option value="sample" ${profile.source === "sample" ? "selected" : ""}>Sample height / OPD</option><option value="difference" ${profile.source === "difference" ? "selected" : ""}>Sample − reference</option></select></label><label>Direction<select data-profile="axis"><option value="horizontal" ${profile.axis === "horizontal" ? "selected" : ""}>Horizontal row</option><option value="vertical" ${profile.axis === "vertical" ? "selected" : ""}>Vertical column</option></select></label><label>Row / column · ROI pixel<input data-profile="index" type="number" min="0" max="${(result?.n || 64) - 1}" step="1" value="${profile.index}"></label></div>${profileSVG()}<button data-measure="profile-csv" ${profileData().length ? "" : "disabled"}>Export cross-section CSV</button></section>`;
   }
   function paintInput() {
     const canvas = $("#measurement-input");
@@ -162,10 +258,11 @@ export function createMetrologyWorkspace({
   }
   function paintResult() {
     if (!result) return;
-    const values = result[view];
+    const displayed = view === "difference" ? difference : result;
+    const values = view === "difference" ? difference?.height : result[view];
     if (!values) {
       $("#measurement-map-scale").textContent =
-        "No Fourier spectrum for this method.";
+        "No data for this view. Reconstruct or apply a reference comparison.";
       const c = $("#measurement-map");
       c.width = c.width;
       return;
@@ -180,7 +277,7 @@ export function createMetrologyWorkspace({
       max = -Infinity;
     for (let i = 0; i < values.length; i++)
       if (
-        (view === "spectrum" || view === "visibility" || result.mask[i]) &&
+        (view === "spectrum" || view === "visibility" || displayed.mask[i]) &&
         Number.isFinite(values[i])
       ) {
         min = Math.min(min, values[i]);
@@ -196,7 +293,7 @@ export function createMetrologyWorkspace({
     }
     for (let i = 0; i < values.length; i++) {
       const valid =
-          (view === "spectrum" || view === "visibility" || result.mask[i]) &&
+          (view === "spectrum" || view === "visibility" || displayed.mask[i]) &&
           Number.isFinite(values[i]),
         t = valid
           ? Math.max(0, Math.min(1, (values[i] - min) / (max - min || 1)))
@@ -214,11 +311,15 @@ export function createMetrologyWorkspace({
     }
     ctx.putImageData(img, 0, 0);
     $("#measurement-map-scale").textContent =
-      `${fmt(min, 3)} → ${fmt(max, 3)} ${view === "height" ? "nm" : view === "phase" || view === "wrapped" ? "rad" : ""} · dark pixels excluded`;
+      `${fmt(min, 3)} → ${fmt(max, 3)} ${view === "height" || view === "difference" ? "nm" : view === "phase" || view === "wrapped" ? "rad" : ""} · dark pixels excluded`;
   }
   async function decode(file) {
     if (file.size > 32 * 1024 * 1024)
       throw Error("Choose images smaller than 32 MB.");
+    if (/\.tiff?$/i.test(file.name))
+      return decodeTIFF(await file.arrayBuffer(), file.name);
+    if (/\.json$/i.test(file.name))
+      return decodeNumericalImage(await file.text(), file.name);
     const url = URL.createObjectURL(file);
     try {
       const image = new Image();
@@ -279,11 +380,22 @@ export function createMetrologyWorkspace({
       settings,
       project: sourceProject ?? getProject(),
       result,
+      reference,
+      comparison: difference
+        ? {
+            registration: difference.registration,
+            stats: difference.stats,
+            removedMeanNm: difference.removedMeanNm,
+          }
+        : null,
+      profile,
     });
   }
   async function reconstruct() {
     busy = true;
     result = null;
+    difference = null;
+    registration.verified = false;
     const token = ++job;
     render();
     try {
@@ -324,7 +436,7 @@ export function createMetrologyWorkspace({
       }
     }
   }
-  function loadRecord(r) {
+  async function loadRecord(r) {
     if (
       r.format !== "optibench-measurement" ||
       r.version !== 1 ||
@@ -346,7 +458,26 @@ export function createMetrologyWorkspace({
     invalidate();
     message = `Loaded saved data from ${r.createdAt}. Reconstructing with engine ${METROLOGY_VERSION}; the imported file retains its original results.`;
     render();
-    reconstruct();
+    await reconstruct();
+    reference = r.reference ? referenceRecord(r.reference) : null;
+    profile = { axis: "horizontal", index: 0, source: "sample", ...r.profile };
+    try {
+      crossSection(result, { ...profile, pixelUm: settings.pixelUm });
+    } catch {
+      profile = { axis: "horizontal", index: 0, source: "sample" };
+    }
+    if (result && reference && r.comparison?.registration) {
+      registration = { ...r.comparison.registration };
+      try {
+        applyReference();
+      } catch (e) {
+        difference = null;
+        registration.verified = false;
+        message =
+          "Run restored; reference comparison needs attention: " + e.message;
+      }
+    }
+    render();
   }
   async function handleClick(e) {
     const b = e.target.closest("[data-measure]");
@@ -356,6 +487,45 @@ export function createMetrologyWorkspace({
     if ((busy || importing) && action !== "close") return;
     try {
       switch (action) {
+        case "image-template":
+          download(
+            "intensity-template.json",
+            JSON.stringify({
+              width: 64,
+              height: 64,
+              fullScale: 65535,
+              values: Array.from(
+                { length: 4096 },
+                (_, i) => 16384 + (i % 64) * 512,
+              ),
+            }),
+          );
+          return;
+        case "estimate-reference": {
+          const estimate = estimateTranslation(result, referenceResult());
+          registration = { dx: estimate.dx, dy: estimate.dy, verified: false };
+          difference = null;
+          message = `Candidate (${estimate.dx}, ${estimate.dy}) px · correlation ${fmt(estimate.score, 3)} · peak gap ${fmt(estimate.gap, 3)}. ${estimate.note}`;
+          render();
+          return;
+        }
+        case "apply-reference":
+          applyReference();
+          view = "difference";
+          message =
+            "Reference subtracted over the valid overlap; common mean removed.";
+          render();
+          return;
+        case "difference-csv":
+          download(
+            "sample-minus-reference.csv",
+            differenceCSV(difference, settings),
+            "text/csv",
+          );
+          return;
+        case "profile-csv":
+          download("cross-section.csv", profileCSV(), "text/csv");
+          return;
         case "close":
           root.hidden = true;
           if (document.querySelector("#app"))
@@ -437,7 +607,7 @@ export function createMetrologyWorkspace({
           $("#measurement-run-file").click();
           return;
         case "load-run":
-          loadRecord(runs.find((r) => r.id === b.dataset.id));
+          await loadRecord(runs.find((r) => r.id === b.dataset.id));
           return;
         case "delete-run":
           await store.remove(b.dataset.id);
@@ -459,7 +629,7 @@ export function createMetrologyWorkspace({
             map = $("#measurement-map").toDataURL("image/png");
           download(
             "optibench-measurement-report.html",
-            `<!doctype html><html lang="en"><meta charset="utf-8"><title>${esc(r.name)}</title><style>body{font:16px system-ui;max-width:900px;margin:40px auto;padding:24px;color:#17212b}table{border-collapse:collapse}td,th{border:1px solid #bbb;padding:8px;text-align:left}img{max-width:512px;width:100%}pre{white-space:pre-wrap}small{color:#555}</style><h1>${esc(r.name)}</h1><p>${esc(r.createdAt)} · OptiBench metrology ${METROLOGY_VERSION}</p><p>${esc(frames[0].origin)} · ${esc(result.unit)} · ${settings.removeTilt ? "fitted plane" : "mean"} removed</p><table><tr><th>PV</th><th>RMS</th><th>Valid area</th><th>Visibility</th></tr><tr><td>${fmt(result.stats.pvNm)} nm</td><td>${fmt(result.stats.rmsNm)} nm</td><td>${fmt(result.stats.validFraction * 100)}%</td><td>${fmt(result.stats.meanVisibility * 100)}%</td></tr></table><h2>${esc(view)} map</h2><img alt="Measurement map" src="${map}"><p>${esc($("#measurement-map-scale").textContent)}</p><h2>Settings</h2><pre>${esc(JSON.stringify(settings, null, 2))}</pre><h2>Input frames</h2><ul>${frames.map((f) => `<li>${esc(f.name)} · ${f.width} × ${f.height}</li>`).join("")}</ul><p>Dark: ${esc(dark?.name || "none")} · Flat: ${esc(flat?.name || "none")}</p><h2>Diagnostics</h2><ul>${result.warnings.map((w) => `<li>${esc(w)}</li>`).join("")}</ul><p>Unwrap conflicts: ${result.stats.unwrapConflicts}. Phase-step residual: ${fmt(result.stats.stepResidual, 6)}. PV and RMS are descriptive statistics, not uncertainty bounds. Relative fringe order and calibrated pixel scale remain the experimenter’s responsibility. Single-image phase sign requires a reference. Keep the exported run JSON and original camera files with this report.</p><h2>Notes</h2><pre>${esc(notes)}</pre></html>`,
+            `<!doctype html><html lang="en"><meta charset="utf-8"><title>${esc(r.name)}</title><style>body{font:16px system-ui;max-width:900px;margin:40px auto;padding:24px;color:#17212b}table{border-collapse:collapse}td,th{border:1px solid #bbb;padding:8px;text-align:left}img{max-width:512px;width:100%}pre{white-space:pre-wrap}small{color:#555}</style><h1>${esc(r.name)}</h1><p>${esc(r.createdAt)} · OptiBench metrology ${METROLOGY_VERSION}</p><p>${esc(frames[0].origin)} · ${esc(result.unit)} · ${settings.removeTilt ? "fitted plane" : "mean"} removed</p><table><tr><th>PV</th><th>RMS</th><th>Valid area</th><th>Visibility</th></tr><tr><td>${fmt(result.stats.pvNm)} nm</td><td>${fmt(result.stats.rmsNm)} nm</td><td>${fmt(result.stats.validFraction * 100)}%</td><td>${fmt(result.stats.meanVisibility * 100)}%</td></tr></table><h2>${esc(view)} map</h2><img alt="Measurement map" src="${map}"><p>${esc($("#measurement-map-scale").textContent)}</p><h2>Settings</h2><pre>${esc(JSON.stringify(settings, null, 2))}</pre><h2>Input frames</h2><ul>${frames.map((f) => `<li>${esc(f.name)} · ${f.width} × ${f.height} · ${esc(f.precision || "normalized intensity")} · full scale ${esc(f.fullScale || 1)}</li>`).join("")}</ul><p>Dark: ${esc(dark?.name || "none")} · Flat: ${esc(flat?.name || "none")}</p><h2>Diagnostics</h2><ul>${result.warnings.map((w) => `<li>${esc(w)}</li>`).join("")}</ul><p>Unwrap conflicts: ${result.stats.unwrapConflicts}. Phase-step residual: ${fmt(result.stats.stepResidual, 6)}. PV and RMS are descriptive statistics, not uncertainty bounds. Relative fringe order and calibrated pixel scale remain the experimenter’s responsibility. Single-image phase sign requires a reference. Keep the exported run JSON and original camera files with this report.</p>${referenceReport()}<h2>Cross-section</h2>${profileSVG()}<h2>Notes</h2><pre>${esc(notes)}</pre></html>`,
             "text/html",
           );
           return;
@@ -477,6 +647,33 @@ export function createMetrologyWorkspace({
       return;
     }
     try {
+      if (el.id === "measurement-reference") {
+        reference = el.value
+          ? referenceRecord(runs.find((r) => r.id === el.value) || reference)
+          : null;
+        difference = null;
+        registration = { dx: 0, dy: 0, verified: false };
+        render();
+        return;
+      }
+      if (el.dataset.registration) {
+        registration[el.dataset.registration] =
+          el.type === "checkbox" ? el.checked : Number(el.value);
+        if (el.type !== "checkbox") registration.verified = false;
+        difference = null;
+        render();
+        return;
+      }
+      if (el.dataset.profile) {
+        profile[el.dataset.profile] =
+          el.dataset.profile === "index" ? Number(el.value) : el.value;
+        profile.index = Math.max(
+          0,
+          Math.min((result?.n || 64) - 1, Math.round(profile.index) || 0),
+        );
+        renderAdvanced();
+        return;
+      }
       if (el.id === "measurement-name") {
         name = el.value;
         return;
@@ -581,7 +778,7 @@ export function createMetrologyWorkspace({
         if (file.size > 250 * 1024 * 1024)
           throw Error("Run JSON exceeds the 250 MB import limit.");
         importing = true;
-        loadRecord(JSON.parse(await file.text()));
+        await loadRecord(JSON.parse(await file.text()));
         return;
       }
     } catch (error) {

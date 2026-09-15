@@ -203,3 +203,32 @@ test("measurement exports include reproducible samples, a pixel map and an escap
     win.HTMLAnchorElement.prototype.click = oldClick;
   }
 });
+
+test("reference comparison saves, restores and invalidates registration with edits", async () => {
+  await click("demo");
+  await click("analyze");
+  await click("save");
+  const ref = Array.from(records.values()).at(-1);
+  let select = $("#measurement-reference");
+  select.value = ref.id;
+  select.dispatchEvent(new Event("change", { bubbles: true }));
+  assert.equal($('[data-measure="apply-reference"]').disabled, true);
+  let verified = $('[data-registration="verified"]');
+  verified.checked = true;
+  verified.dispatchEvent(new Event("change", { bubbles: true }));
+  await click("apply-reference");
+  assert.match($("#measurement-advanced").textContent, /Common mean removed/);
+  await click("save");
+  const saved = Array.from(records.values()).at(-1);
+  assert.equal(saved.reference.id, ref.id);
+  assert.equal(saved.comparison.stats.rmsNm, 0);
+  assert.equal(saved.reference.reference, undefined);
+  $(`[data-measure="load-run"][data-id="${saved.id}"]`).click();
+  await tick();
+  assert.match($("#measurement-advanced").textContent, /Common mean removed/);
+  const dx = $('[data-registration="dx"]');
+  dx.value = "1";
+  dx.dispatchEvent(new Event("change", { bubbles: true }));
+  assert.equal($('[data-measure="apply-reference"]').disabled, true);
+  assert.equal($('[data-measure="difference-csv"]').disabled, true);
+});

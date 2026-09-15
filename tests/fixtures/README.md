@@ -1,0 +1,1 @@
+TIFF fixtures generated with Pillow from a 64×64 unsigned 16-bit image, sample i = (i*127+32701)%65536. Files use Pillow compression modes raw, tiff_lzw, packbits and tiff_adobe_deflate respectively. These independent encodings test exact sample preservation, including low bits, without a runtime imaging dependency.

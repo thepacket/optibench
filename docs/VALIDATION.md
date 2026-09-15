@@ -134,3 +134,9 @@ Mount assemblies are parametric assumptions, not catalog-verified products: post
 Tests check source elevation rise, projected mirror double-angle response, splitter-branch elevation, lens vertical focusing, missed mirrors, blocked irises, exact table interception, dual-iris pointing/centring, stage limits, thread/holder diagnostics, project round trips and explicit wave-solver limits. Application tests cover synchronized side projections, stage nudges, selection, undo, persistent height changes and diagnostics.
 
 Alignment reference: [Newport two-mirror alignment application note](https://www.newport.com/medias/sys_master/images/images/h4b/h31/8797093363742/Fast-Steering-Mirror-Technology-App-Note-2.pdf).
+
+## Scientific image input and reference subtraction
+
+The TIFF decoder is verified sample-by-sample against four independently generated Pillow `I;16` files (uncompressed, LZW, PackBits and Adobe Deflate). Each contains 64×64 samples `(i × 127 + 32701) mod 65536`; test fixtures preserve low bits. A constructed big-endian fixture verifies horizontal prediction and white-is-zero inversion. Truncated offsets and invalid numerical intensity samples fail explicitly.
+
+Reference tests verify a known residual and mean removal, a half-pixel shift with invalid interpolation neighbors, calibration mismatch rejection, operator-verification gating and a known correlation translation. Profiles preserve mask gaps and calibrated pixel-center coordinates. An emulated-DOM workflow verifies saving and reopening an attached reference, zero self-difference and invalidation after registration edits. These checks validate the implemented algorithms; they do not establish instrument uncertainty or resolve fringe-registration ambiguity.
