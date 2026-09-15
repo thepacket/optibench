@@ -1,3 +1,5 @@
+import { compareStudies } from "./study-comparison.js";
+import { comparisonHTML } from "./study-comparison-ui.js";
 import { reopenSimulationStudy, createSweepArchive } from "./sweep-archive.js";
 import { archiveStore } from "./run-store.js";
 import { simulateRuns } from "./simulation-runs.js";
@@ -26,6 +28,9 @@ export function createSimulationWorkspace({
 }) {
   let root,
     study = null,
+    comparison = null,
+    compareA = "",
+    compareB = "",
     workingProject = null,
     entries = [],
     parent = null,
@@ -75,9 +80,16 @@ export function createSimulationWorkspace({
       )
       .join(
         "",
-      )}</select></label>${["start", "end", "count", "seed"].map((key) => `<label>${key}<input data-config="${key}" type="number" step="any" value="${config[key]}"></label>`).join("")}</div><p role="status">${esc(message)}</p><p>128² sample grid. Exposure and noise use an illustrative normalized-intensity readout, not the camera hardware model. Shared seeds isolate parameter effects; these runs are not independent repeats.</p>${study ? `<h2>${esc(study.config.parameter)} comparison</h2>${plot()}<div class="measurement-table-scroll"><table><thead><tr><th>Value</th><th>Status</th><th>Center intensity · frame 0</th><th>Visibility</th><th>PV / RMS · nm</th><th>Error RMS · nm</th><th>Valid area</th></tr></thead><tbody>${study.rows.map((r) => `<tr><td>${fmt(r.value)}</td><td>${esc(r.error || r.status)}</td><td>${fmt(r.intensity)}</td><td>${fmt(r.visibility)}</td><td>${fmt(r.pvNm)} / ${fmt(r.rmsNm)}</td><td>${fmt(r.errorRMSNm)}</td><td>${fmt(r.validFraction == null ? null : r.validFraction * 100)}%</td></tr>${r.warnings?.length ? `<tr><td colspan="7">${r.warnings.map(esc).join(" · ")}</td></tr>` : ""}`).join("")}</tbody></table></div>${study.notes.map((n) => `<p>${esc(n)}</p>`).join("")}` : ""}${historyHTML()}</main><input id="simulation-file" type="file" accept=".json" hidden>`;
+      )}</select></label>${["start", "end", "count", "seed"].map((key) => `<label>${key}<input data-config="${key}" type="number" step="any" value="${config[key]}"></label>`).join("")}</div><p role="status">${esc(message)}</p><p>128² sample grid. Exposure and noise use an illustrative normalized-intensity readout, not the camera hardware model. Shared seeds isolate parameter effects; these runs are not independent repeats.</p>${study ? `<h2>${esc(study.config.parameter)} comparison</h2>${plot()}<div class="measurement-table-scroll"><table><thead><tr><th>Value</th><th>Status</th><th>Center intensity · frame 0</th><th>Visibility</th><th>PV / RMS · nm</th><th>Error RMS · nm</th><th>Valid area</th></tr></thead><tbody>${study.rows.map((r) => `<tr><td>${fmt(r.value)}</td><td>${esc(r.error || r.status)}</td><td>${fmt(r.intensity)}</td><td>${fmt(r.visibility)}</td><td>${fmt(r.pvNm)} / ${fmt(r.rmsNm)}</td><td>${fmt(r.errorRMSNm)}</td><td>${fmt(r.validFraction == null ? null : r.validFraction * 100)}%</td></tr>${r.warnings?.length ? `<tr><td colspan="7">${r.warnings.map(esc).join(" · ")}</td></tr>` : ""}`).join("")}</tbody></table></div>${study.notes.map((n) => `<p>${esc(n)}</p>`).join("")}` : ""}${historyHTML()}${comparisonPanel()}</main><input id="simulation-file" type="file" accept=".json" hidden>`;
     root.onchange = async (e) => {
       if (busy) return;
+      if (e.target.dataset.compare) {
+        if (e.target.dataset.compare === "a") compareA = e.target.value;
+        else compareB = e.target.value;
+        comparison = null;
+        render();
+        return;
+      }
       if (e.target.id === "simulation-file") {
         const f = e.target.files?.[0];
         if (!f) return;
@@ -131,6 +143,52 @@ export function createSimulationWorkspace({
       }
       if (busy) return;
       try {
+        if (a === "compare") {
+          busy = true;
+          comparison = null;
+          message = "Recomputing both revisions for comparison…";
+          render();
+          const left = entries.find((a) => a.id === compareA),
+            right = entries.find((a) => a.id === compareB);
+          if (!left || !right) throw Error("Choose two saved sweep revisions.");
+          if (typeof Worker === "undefined")
+            comparison = compareStudies(left, right);
+          else {
+            const w = new Worker(
+              new URL("./simulation-worker.js", import.meta.url),
+              { type: "module" },
+            );
+            try {
+              comparison = await new Promise((resolve, reject) => {
+                w.onmessage = ({ data }) =>
+                  data.error ? reject(Error(data.error)) : resolve(data.result);
+                w.onerror = () =>
+                  reject(Error("Study comparison worker failed."));
+                w.postMessage({ operation: "compare", left, right });
+              });
+            } finally {
+              w.terminate();
+            }
+          }
+          message =
+            "Comparison complete. Review compatibility notes and differences below.";
+          return;
+        }
+        if (a === "comparison-json") {
+          download(
+            "optibench-study-comparison.json",
+            JSON.stringify(comparison),
+          );
+          return;
+        }
+        if (a === "comparison-report") {
+          download(
+            "optibench-study-comparison.html",
+            `<!doctype html><html lang="en"><meta charset="utf-8"><title>OptiBench study comparison</title><style>body{font:16px system-ui;max-width:1200px;margin:40px auto;padding:20px}td,th{padding:8px;border:1px solid #aaa;text-align:left}table{border-collapse:collapse}pre{white-space:pre-wrap}svg{max-width:650px}small{display:block}</style><h1>OptiBench study comparison</h1><p>${esc(comparison.createdAt)} · synthetic model comparison · schema ${comparison.version}</p>${comparisonHTML(comparison)}</html>`,
+            "text/html",
+          );
+          return;
+        }
         if (a === "open-file") {
           root.querySelector("#simulation-file").click();
           return;
@@ -264,6 +322,17 @@ export function createSimulationWorkspace({
     message =
       restored.summary +
       ". The active bench is unchanged; the controls use the saved study bench.";
+  }
+  function comparisonPanel() {
+    const options = (selected) =>
+      '<option value="">Choose revision…</option>' +
+      entries
+        .map(
+          (a) =>
+            `<option value="${esc(a.id)}" ${selected === a.id ? "selected" : ""}>${esc(a.title)} / ${esc(a.revisionName)} · ${esc(a.createdAt)}</option>`,
+        )
+        .join("");
+    return `<section class="validation-card"><h2>Compare saved studies</h2><div class="measurement-two"><label>Revision A<select data-compare="a">${options(compareA)}</select></label><label>Revision B<select data-compare="b">${options(compareB)}</select></label></div><div class="measurement-buttons"><button data-sim="compare" ${compareA && compareB && compareA !== compareB && !busy ? "" : "disabled"}>Recompute & compare</button><button data-sim="comparison-json" ${comparison && !busy ? "" : "disabled"}>Export comparison JSON</button><button data-sim="comparison-report" ${comparison && !busy ? "" : "disabled"}>Export comparison report</button></div>${comparisonHTML(comparison)}</section>`;
   }
   function historyHTML() {
     return `<section class="validation-card"><h2>Complete sweep archive</h2><p>${esc(archiveMessage)}</p><p>All points, including failures, are stored in one revision. These are synthetic simulation records. Export JSON for backup; revisions are local to this browser.</p><div class="measurement-two"><label>Experiment title<input data-revision="title" value="${esc(title)}" maxlength="120"></label><label>Revision name<input data-revision="name" value="${esc(revisionName)}" maxlength="120"></label></div><label>Revision notes<textarea data-revision="notes" maxlength="10000">${esc(revisionNotes)}</textarea></label><p>${parent ? "Next revision branches from " + esc(parent.revisionName) : "New sweep history"}</p><button data-sim="save-revision" ${study && !busy ? "" : "disabled"}>Save entire sweep revision</button>${verification ? `<h3>${esc(verification.summary)}</h3><p>Frame tolerance 10⁻¹² normalized intensity; map and scalar tolerance 10⁻⁷; mask and status must agree. Recomputed results are shown; saved revisions are not changed.</p><ul>${verification.checks.map((c) => `<li>Point ${c.index + 1} (${fmt(c.value)}): ${esc(c.status)} · ${esc(c.savedStatus)} → ${esc(c.recomputedStatus)}${c.savedError ? ` · archived: ${esc(c.savedError)}` : ""}</li>`).join("")}</ul>` : ""}<div class="measurement-table-scroll"><table><thead><tr><th>Experiment / revision</th><th>Saved</th><th>Points / failures</th><th>Notes</th><th>Actions</th></tr></thead><tbody>${entries.map((a) => `<tr><td>${esc(a.title)}<small>${esc(a.revisionName)}</small></td><td>${esc(a.createdAt)}</td><td>${a.study.rows.length} / ${a.study.rows.filter((r) => r.status === "failed").length}</td><td>${esc(a.revisionNotes)}</td><td><button data-sim="open-revision" data-id="${esc(a.id)}">Open & recompute</button><button data-sim="export-revision" data-id="${esc(a.id)}">Export</button></td></tr>`).join("")}</tbody></table></div></section>`;

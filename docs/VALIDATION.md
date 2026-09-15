@@ -176,3 +176,7 @@ Tests verify that a Michelson arm piston completes an intensity cycle after λ/2
 Simulation-study and sweep-archive schemas validate row counts, point ordering, unique successful acquisition IDs, bench schemas and 128² four-frame source samples before reconstruction. Reopening regenerates all cases from the stored base bench/configuration and compares frames, retained masks, height maps, scalar summaries, bench snapshots and failure status. It uses the fresh results in the workspace while retaining saved revision data unchanged.
 
 Tests round-trip complete studies, reproduce their values, preserve acquisition identities and parent revision links, identify modified frames/maps and historical failure transitions, reject incomplete studies, and reopen a Michelson archive while the active bench remains an expander. UI tests also save a new revision, retain controls across closing/reopening, and explicitly reset to the active bench. All tests run in the GitHub workflow.
+
+## Saved sweep comparison
+
+Tests reproduce identical saved revisions with zero metric deltas, verify source immutability and revision identity, suppress overlays/deltas for mismatched grids, retain unmatched points from the longer study, identify component edits/additions/removals, escape report labels, and exercise revision selection and stale-export invalidation in an emulated DOM. Comparison uses freshly regenerated results with the sweep archive's existing replay checks. Compatibility checks are explicit constraints on model comparison, not evidence of physical equivalence.
