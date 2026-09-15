@@ -352,6 +352,8 @@ for (const axis of [0, 45, 90])
     axis,
     diameter: 25.4,
   });
+for (const [name, retardance] of [["Half-wave plate",180],["Quarter-wave plate",90]])
+  entry({part:`DESIGN-WP-${retardance}`,name,type:"waveplate",category:"Filters & polarization",axis:0,retardance,transmission:1,diameter:25.4});
 for (const diameter of [25, 50, 100])
   entry({
     part: `DESIGN-SCREEN-${diameter}`,

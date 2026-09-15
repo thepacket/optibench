@@ -224,3 +224,7 @@ Added end-to-end optical fixtures for Gaussian free-space radius, 13-ray thin-le
 ### Power-meter instrument
 
 Power-meter tests cover Gaussian power capture, wavelength-setting response, raw overload before zero subtraction, shutter-based zero calibration and invalidation, deterministic noise, variance reduction through averaging, integrated Michelson piston interference, and the save/history UI workflow. The response curve and electrical noise/offset are illustrative assumptions. These software checks do not establish physical instrument calibration or a complete uncertainty budget.
+
+### Straight-path Jones polarization
+
+`polarization.test.js` covers analytical HWP/analyzer transmission, QWP circularity, source ellipticity, nonideal polarizer leakage/loss, straight power-meter capture and unsaturated Fourier-camera response. App tests cover setup loading and editing/persisting retardance, rotation, ellipticity and leakage. Advanced folded/coherent polarization fails explicitly. Waveplate retardance is fixed at the operating wavelength, and the Jones field is spatially uniform; material dispersion, vector diffraction, finite optic-edge diffraction and real reflection/coating matrices remain outside this model.

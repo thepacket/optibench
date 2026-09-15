@@ -344,7 +344,7 @@ function opticalGlyph(c) {
     geom = `<path d="M-3 ${-d / 2}v${d}" stroke="#929fae" stroke-width="7"/><path d="M1 ${-d / 2}v${d}" stroke="#e3eeff" stroke-width="2"/>`;
   if (type === "splitter")
     geom = `<rect x="${-d * 0.4}" y="${-d * 0.4}" width="${d * 0.8}" height="${d * 0.8}" rx="2" fill="#8ec8ff22" stroke="#6b99af"/><path d="M0 ${-d * 0.55}v${d * 1.1}" stroke="#b8dfff" stroke-width="2"/>`;
-  if (["aperture", "slit", "polarizer", "filter"].includes(type))
+  if (["aperture", "slit", "polarizer", "waveplate", "filter"].includes(type))
     geom = `<rect x="-5" y="${-body / 2}" width="10" height="${body}" rx="2" fill="${type === "filter" ? "#945c7955" : type === "polarizer" ? "#ab9ada66" : "#788694"}" stroke="#c2cad5"/><path d="M-5 ${-Math.min(c.aperture || 6, body) / 2}h10v${Math.min(c.aperture || 6, body)}H-5Z" fill="#141b22"/>`;
   if (["screen", "camera", "power"].includes(type))
     geom = `<rect x="-10" y="${-body / 2}" width="23" height="${body}" rx="3" fill="#3d364b" stroke="#b7a2e1"/><path d="M-11 ${-body * 0.36}v${body * 0.72}" stroke="#cab8ed" stroke-width="4"/>`;
@@ -494,11 +494,13 @@ function renderInspector() {
         max: 1e6,
       }) +
       inputField("Beam quality", "m2", c.m2, { unit: "M²", min: 1, max: 100 }) +
-      inputField("Linear polarization", "polarization", c.polarization, {
+      inputField("Polarization azimuth", "polarization", c.polarization, {
         unit: "°",
         min: -360,
         max: 360,
       }) +
+      inputField("Ellipticity angle", "ellipticity", c.ellipticity ?? 0, {unit:"°",min:-45,max:45,step:1}) +
+      `<p class="field-note">0° = linear; ±45° = circular; intermediate values = elliptical. Azimuth rotates the ellipse. Jones axes: in-table transverse / vertical, exp(−iωt). Advanced states require a straight path.</p>` +
       inputField(
         "Coherence length · 1/e",
         "coherenceLength",
@@ -558,6 +560,11 @@ function renderInspector() {
       min: -360,
       max: 360,
     });
+  if (["polarizer","waveplate"].includes(c.type)) {
+    if(c.type === "waveplate") optical = inputField("Fast-axis rotation", "axis", c.axis, {unit:"°",min:-360,max:360}) + inputField("Retardance", "retardance", c.retardance, {unit:"°",min:-720,max:720,step:1}) + `<p class="field-note">180° = half-wave; 90° = quarter-wave. Constant retardance at the operating wavelength; no material dispersion or walk-off model.</p>`;
+    optical += inputField("Pass-axis transmission", "transmission", c.transmission, {min:0,max:1,step:.01});
+    if(c.type === "polarizer") optical += inputField("Blocked / pass power ratio", "leakage", c.leakage ?? 0, {min:0,max:1,step:"any"}) + `<p class="field-note">0 = ideal extinction; 0.0001 = 10,000:1 extinction. Straight-path Jones model for nonideal optics.</p>`;
+  }
   if (c.type === "screen")
     optical = `<label class="checkbox-row"><input data-field="terminate" type="checkbox" ${c.terminate ? "checked" : ""}>Terminate the beam at this screen</label>`;
   if (c.type === "camera")

@@ -76,8 +76,8 @@ const read = () => tools.get("read_optical_bench").execute({});
 function closeDialog() {
   if (el("#dialog").open) click('[data-action="close-dialog"]');
 }
-test("app renders a 291-entry inventory and a fully traced laboratory setup", () => {
-  assert.equal(document.querySelectorAll(".catalog-card").length, 291);
+test("app renders a 293-entry inventory and a fully traced laboratory setup", () => {
+  assert.equal(document.querySelectorAll(".catalog-card").length, 293);
   assert.equal(read().project.items.length, 6);
   assert.equal(read().detectors.length, 2);
   assert.match(el("#table-label").textContent, /1500 × 900/);
@@ -147,7 +147,7 @@ test("parts and template dialogs populate from the active project", () => {
   assert.match(el("#dialog-body").textContent, /6 placed components/);
   closeDialog();
   click('[data-action="templates"]');
-  assert.equal(document.querySelectorAll(".template-card").length, 10);
+  assert.equal(document.querySelectorAll(".template-card").length, 12);
   closeDialog();
 });
 test("template switching traces folded paths and leaves prior project undoable", () => {
@@ -364,4 +364,20 @@ test("table scales with panel height while preserving zoom and centre", () => {
   delete stage.clientWidth;
   delete stage.clientHeight;
   click('[data-action="fit"]');
+});
+
+test('waveplate setup exposes source ellipticity, axis, retardance and extinction controls',()=>{
+ click('[data-action="templates"]');click('[data-template="waveplates"]');
+ click('[data-action="select"][data-id="2"]');
+ assert.ok(el('[data-field="retardance"]'));
+ change('[data-field="retardance"]',90);change('[data-field="axis"]',45);
+ assert.equal(read().project.items.find(c=>c.id===2).retardance,90);
+ el('[data-component="1"]').dispatchEvent(new window.PointerEvent("pointerdown",{bubbles:true,button:0,pointerId:1,clientX:200,clientY:450}));
+ el("#bench").dispatchEvent(new window.PointerEvent("pointerup",{bubbles:true,pointerId:1}));
+ change('[data-field="ellipticity"]',45);
+ assert.equal(read().project.items.find(c=>c.id===1).ellipticity,45);
+ el('[data-component="3"]').dispatchEvent(new window.PointerEvent("pointerdown",{bubbles:true,button:0,pointerId:1,clientX:700,clientY:450}));
+ el("#bench").dispatchEvent(new window.PointerEvent("pointerup",{bubbles:true,pointerId:1}));
+ change('[data-field="leakage"]',.001);
+ assert.equal(read().project.items.find(c=>c.id===3).leakage,.001);
 });

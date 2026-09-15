@@ -1,3 +1,4 @@
+import { sourceJones, polarizationElement } from "./polarization.js";
 import { clamp, seededRandom, normalRandom } from "./optics.js";
 export function fft(re, im, inverse = false) {
   const n = re.length;
@@ -205,7 +206,7 @@ export function solveWave(
     lambda = src.wavelength * 1e-6,
     k = (2 * Math.PI) / lambda,
     warnings = [];
-  let pol = src.polarization || 0;
+  let jones = sourceJones(src);
   for (let y = 0; y < n; y++)
     for (let x = 0; x < n; x++) {
       const xx = (x - n / 2) * dx,
@@ -255,6 +256,11 @@ export function solveWave(
       break;
     }
     const offset = lateral(c);
+    let polarizationAmplitude = 1;
+    if (["polarizer","waveplate"].includes(c.type)) {
+      const state = polarizationElement(jones,c); jones = state.jones;
+      polarizationAmplitude = Math.sqrt(state.power);
+    }
     let maxOccupiedRadius = 0;
     const pre = intensity(re, im);
     let max = 0;
@@ -277,15 +283,13 @@ export function solveWave(
         if (c.type === "aperture" && r2 > (c.aperture / 2) ** 2) amp = 0;
         if (c.type === "slit" && Math.abs(xx) > c.aperture / 2) amp = 0;
         if (c.type === "filter") amp = Math.sqrt(c.transmission);
-        if (c.type === "polarizer")
-          amp = Math.cos(((pol - c.axis) * Math.PI) / 180);
+        if (["polarizer","waveplate"].includes(c.type)) amp = polarizationAmplitude;
         let cr = Math.cos(phase) * amp,
           ci = Math.sin(phase) * amp,
           r = re[i];
         re[i] = r * cr - im[i] * ci;
         im[i] = r * ci + im[i] * cr;
       }
-    if (c.type === "polarizer") pol = c.axis;
     if (
       c.type === "lens" &&
       (maxOccupiedRadius * dx) / (lambda * Math.abs(c.f)) > 0.5

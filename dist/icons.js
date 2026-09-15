@@ -48,6 +48,7 @@ export const typeIcon = (t) =>
     screen: "grid",
     power: "chart",
     polarizer: "filter",
+    waveplate: "filter",
     filter: "filter",
     mechanical: "settings",
     stop: "close",

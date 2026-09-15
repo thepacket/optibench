@@ -72,6 +72,7 @@ export function incidentPower(project, detectorId, blocked = false) {
   const t = trace(p),
     hits = t.detectors.filter((h) => h.id === detectorId),
     n = 256;
+  if(t.warnings.some(w=>w.level==='error')) throw Error(t.warnings.filter(w=>w.level==='error').map(w=>w.text).join(' '));
   const radius = (head.aperture || head.diameter) / 2;
   let groups = new Map();
   for (const h of hits) {

@@ -1,5 +1,5 @@
 import { catalog, instantiate } from "./catalog.js";
-export const ENGINE_VERSION = "0.5.0";
+export const ENGINE_VERSION = "0.6.0";
 export const DEFAULT_TABLE = {
   width: 1500,
   height: 900,
@@ -106,6 +106,15 @@ export function makeProject(template = "expander") {
       exposure: 100,
     });
     p.wave = { n: 512, width: 6 };
+  }
+  if (["waveplates","waveplates-camera"].includes(template)) {
+    p.title = "Waveplates · polarization experiment";
+    add("DESIGN-LASER-633",200,450,{power:0.00001,polarization:0});
+    add("DESIGN-WP-180",450,450,{axis:22.5,label:"WP1 · Half-wave plate"});
+    add("DESIGN-POL-0",700,450,{axis:0,transmission:0.95,leakage:0.0001,label:"P1 · Analyzer"});
+    add("DESIGN-SCREEN-25",900,450,{terminate:false,label:"S1 · Beam preview"});
+    if(template === "waveplates-camera") add("DESIGN-CAMERA",1150,450,{exposure:10,label:"D1 · Polarization camera"});
+    else add("DESIGN-POWER",1150,450,{label:"D1 · Power head"});
   }
   if (template === "polarization") {
     p.title = "Malus law · polarization laboratory";
@@ -278,6 +287,8 @@ export const templates = [
     "Rotate an analyzer and measure Malus-law transmission.",
     "Gaussian",
   ],
+  ["waveplates-camera", "Waveplates & camera", "Observe analyzer transmission on a camera using the Gaussian or Fourier detector view.", "Gaussian"],
+  ["waveplates", "Waveplates & analyzer", "Rotate a half-wave plate before an analyzer; use Power to acquire transmitted readings. Change retardance to 90° for a quarter-wave plate.", "Gaussian"],
   [
     "empty",
     "Empty optical table",
@@ -295,6 +306,7 @@ const allowedTypes = new Set([
   "slit",
   "filter",
   "polarizer",
+  "waveplate",
   "screen",
   "camera",
   "power",
@@ -438,6 +450,7 @@ export function validateProject(input) {
           360,
           "polarization",
         );
+        out.ellipticity = number(c.ellipticity ?? 0, -45, 45, "ellipticity angle");
         out.pattern = ["bars", "double-slit", "pinhole", "image"].includes(
           c.pattern,
         )
@@ -451,8 +464,11 @@ export function validateProject(input) {
         throw Error("Beamsplitter R + T cannot exceed 100%.");
       if (c.type === "mirror")
         out.pistonNm = number(c.pistonNm ?? 0, -1e6, 1e6, "mirror piston");
-      if (c.type === "polarizer")
-        out.axis = number(c.axis ?? 0, -360, 360, "polarizer axis");
+      if (["polarizer", "waveplate"].includes(c.type)) {
+        out.axis = number(c.axis ?? 0, -360, 360, "polarization optic axis");
+        if(c.type === "polarizer") out.leakage = number(c.leakage ?? 0, 0, 1, "blocked/pass power ratio");
+        else out.retardance = number(c.retardance ?? 180, -720, 720, "retardance degrees");
+      }
       if (c.type === "screen") out.terminate = c.terminate !== false;
       if (c.type === "camera")
         for (const [key, min, max, def] of [

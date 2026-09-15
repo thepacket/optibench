@@ -1,8 +1,10 @@
+import { advancedPolarization } from "./polarization.js";
 import { trace, DEG, dot } from "./optics.js";
 import { cameraResponse } from "./wave.js";
 
 // Scalar paraxial TEM00 fields in air. Reciprocal ideal splitter: t=√T, r=i√R.
 export function coherentField(project, detectorId, { n = 256, width } = {}) {
+  if (project.items.some(c=>c.enabled!==false && advancedPolarization(c))) throw Error("Advanced Jones polarization is supported on straight paths only. Interferometry with waveplates, elliptical sources or nonideal polarizers is not yet supported.");
   const detector = project.items.find((c) => c.id === detectorId);
   if (!detector) throw Error("Choose a detector.");
   const traced = trace(project),

@@ -1,3 +1,4 @@
+import { sourceJones, polarizationElement, advancedPolarization } from "./polarization.js";
 // SI optical equations, millimetres for geometry, milliwatts for power.
 export const DEG = Math.PI / 180;
 export const clamp = (x, a, b) => Math.max(a, Math.min(b, x));
@@ -96,6 +97,8 @@ export function trace(project, { rays = false } = {}) {
         last: src.id,
         branch: serial++,
         pol: src.polarization || 0,
+        jones: sourceJones(src),
+        advancedPol: !!src.ellipticity,
         ray: rays,
       });
     }
@@ -188,6 +191,7 @@ export function trace(project, { rays = false } = {}) {
           },
         ],
         polarization: beam.pol,
+        jones: [...beam.jones],
         wavelength: beam.source.wavelength,
         m2: beam.source.m2,
       };
@@ -302,9 +306,19 @@ export function trace(project, { rays = false } = {}) {
         }
       }
       if (c.type === "filter") beam.power *= c.transmission;
+      if (["polarizer","waveplate"].includes(c.type)) {
+        if (next.incidence > 5) { warnings.push({id:c.id,level:"error",text:"Polarization optics require incidence within 5 degrees."}); break; }
+        if (advancedPolarization(c) && beam.path.some(p=>["mirror","splitter"].includes(items.find(i=>i.id===p.id)?.type))) { warnings.push({id:c.id,level:"error",text:"Jones polarization currently supports straight paths only; folded polarization transport is not implemented."}); break; }
+        const state = polarizationElement(beam.jones,c);
+        beam.power *= state.power; beam.jones = state.jones;
+        beam.advancedPol ||= advancedPolarization(c);
+      }
+      if (beam.advancedPol && ["mirror","splitter"].includes(c.type)) {
+        warnings.push({id:c.id,level:"error",text:"Jones polarization currently supports straight paths only; folded polarization transport is not implemented."}); break;
+      }
       if (c.type === "polarizer") {
         if (Math.cos((beam.pol - c.axis) * DEG) < 0) beam.phase += Math.PI;
-        beam.power *= Math.cos((beam.pol - c.axis) * DEG) ** 2;
+
         beam.pol = c.axis;
       }
       if (c.type === "mirror") {
