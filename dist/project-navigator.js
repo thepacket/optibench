@@ -1,9 +1,12 @@
+import { validateRequirements } from "./acceptance.js";
 import { validateProject } from "./project.js";
 import { validateSimulationStudy } from "./sweep-archive.js";
 import { validateAlignmentConfig } from "./alignment-study.js";
 import { validateFrame, validateMeasurementSettings } from "./metrology.js";
 import { serializable } from "./run-store.js";
 export const kinds = {
+  "optibench-requirements": "Requirements",
+  "optibench-acceptance-report": "Acceptance reports",
   "optibench-layout": "Bench layouts",
   "optibench-measurement": "Measurements",
   "optibench-experiment": "Measurement archives",
@@ -24,6 +27,8 @@ export function links(r) {
       [
         r.parentRevisionId,
         r.sourceAlignmentId,
+        r.requirementsId,
+        r.sourceId,
         r.simulation?.studyId,
         ...(r.format === "optibench-study-comparison"
           ? [r.a?.id, r.b?.id]
@@ -72,6 +77,16 @@ export function validateRecord(r) {
     r.id.length > 200
   )
     throw Error("Unsupported project record.");
+  if (r.format === "optibench-requirements") validateRequirements(r);
+  if (r.format === "optibench-acceptance-report") {
+    validateRequirements(r.requirements);
+    if (
+      r.requirementsId !== r.requirements.id ||
+      typeof r.sourceId !== "string" ||
+      !Array.isArray(r.checks)
+    )
+      throw Error("Invalid acceptance report references.");
+  }
   if (r.format === "optibench-layout") validateProject(r.project);
   if (r.format === "optibench-measurement") validateRun(r);
   if (r.format === "optibench-experiment") {

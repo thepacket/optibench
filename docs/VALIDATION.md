@@ -196,3 +196,7 @@ Using the actual in-app browser on localhost, exercised Michelson setup loading,
 The audit found and fixed detached file inputs in project/sweep imports, lingering completed-job progress, and overlapping workspace transitions. Keyboard entry was used for form tests because the browser automation's fill operation did not consistently dispatch the app's change handlers. The downloaded project file itself was not independently inspected; import was verified with a generated schema-valid fixture. No destructive browser purge was performed.
 
 Automated regression tests verify transaction rollback across IndexedDB stores, exact Trash restoration, purge restrictions, three-grid numerical output, cancellation and terminal-response cleanup, workspace isolation and file-input identity retention. These complement the existing numerical and emulated interaction suite; they are not full browser coverage across every platform or all experimental configurations.
+
+## v0.17 requirements and acceptance
+
+Acceptance tests cover inclusive boundaries, known failures with missing evidence, minimum trial counts, failed-trial denominators, both adjacent sampling changes, missing grids, recomputation of tampered cached sweep metrics, report dependency backup closure, HTML escaping, invalid limits and immutable requirement revisions. A real alignment replay verifies saved-proposal identity and refuses a changed saved layout. Acceptance is simulation-based; numerical checks do not establish physical accuracy or sampling convergence.

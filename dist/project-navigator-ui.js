@@ -38,6 +38,7 @@ const download = (r) => {
 export function createProjectNavigator({
   getProject,
   onOpen,
+  onRequirements,
   archives = archiveStore,
   runs = runStore,
   importRecords = importProjectRecords,
@@ -90,7 +91,7 @@ export function createProjectNavigator({
   function render() {
     const visible = view(),
       map = recordIndex(available());
-    root.innerHTML = `<header class="measurement-header"><button data-nav="close" ${busy ? "disabled" : ""}>← Optical bench</button><h1>Projects & experiments</h1><button data-nav="refresh" ${busy ? "disabled" : ""}>Refresh</button><button data-nav="import" ${busy ? "disabled" : ""}>Import project backup</button></header><section id="navigator-storage"></section><div class="navigator-layout"><aside><h2>Project revisions</h2><button data-nav="all">All local records</button><button data-nav="new">New project</button>${projectTree()}<p>Records are stored in this browser. Export project backups for portability.</p></aside><main><div class="measurement-two"><label>Project name<input data-meta="title" maxlength="120" value="${esc(title)}"></label><label>Purpose / notes<textarea data-meta="notes" maxlength="10000">${esc(notes)}</textarea></label></div><p>${parent ? "Editing selection from saved project revision " + esc(parent.createdAt) + ". Saving creates a new revision." : "Select records for a new project revision."}</p><div class="measurement-buttons"><button data-nav="layout" ${busy ? "disabled" : ""}>Save current bench layout</button><button data-nav="select">Select visible records</button><button data-nav="clear">Clear selection</button><button data-nav="save" ${busy ? "disabled" : ""}>Save project revision (${selected.size})</button><button data-nav="export" ${parent && !busy ? "" : "disabled"}>Export saved project backup</button></div><label>Search records<input data-query value="${esc(query)}" placeholder="Name, component, date, ID or notes"></label><p role="status">${esc(message)}</p>${parent?.missingReferences?.length ? `<p>Missing referenced records: ${parent.missingReferences.map(esc).join(", ")}. The backup preserves those IDs but cannot include unavailable records.</p>` : ""}${Object.entries(
+    root.innerHTML = `<header class="measurement-header"><button data-nav="close" ${busy ? "disabled" : ""}>← Optical bench</button><h1>Projects & experiments</h1><button data-nav="requirements" ${busy ? "disabled" : ""}>Requirements & acceptance</button><button data-nav="refresh" ${busy ? "disabled" : ""}>Refresh</button><button data-nav="import" ${busy ? "disabled" : ""}>Import project backup</button></header><section id="navigator-storage"></section><div class="navigator-layout"><aside><h2>Project revisions</h2><button data-nav="all">All local records</button><button data-nav="new">New project</button>${projectTree()}<p>Records are stored in this browser. Export project backups for portability.</p></aside><main><div class="measurement-two"><label>Project name<input data-meta="title" maxlength="120" value="${esc(title)}"></label><label>Purpose / notes<textarea data-meta="notes" maxlength="10000">${esc(notes)}</textarea></label></div><p>${parent ? "Editing selection from saved project revision " + esc(parent.createdAt) + ". Saving creates a new revision." : "Select records for a new project revision."}</p><div class="measurement-buttons"><button data-nav="layout" ${busy ? "disabled" : ""}>Save current bench layout</button><button data-nav="select">Select visible records</button><button data-nav="clear">Clear selection</button><button data-nav="save" ${busy ? "disabled" : ""}>Save project revision (${selected.size})</button><button data-nav="export" ${parent && !busy ? "" : "disabled"}>Export saved project backup</button></div><label>Search records<input data-query value="${esc(query)}" placeholder="Name, component, date, ID or notes"></label><p role="status">${esc(message)}</p>${parent?.missingReferences?.length ? `<p>Missing referenced records: ${parent.missingReferences.map(esc).join(", ")}. The backup preserves those IDs but cannot include unavailable records.</p>` : ""}${Object.entries(
       kinds,
     )
       .map(([format, label]) => {
@@ -126,6 +127,10 @@ export function createProjectNavigator({
       return;
     }
     try {
+      if (a === "requirements") {
+        await onRequirements?.(available());
+        return;
+      }
       if (a === "close") {
         root.hidden = true;
         document.querySelector("#app").inert = false;

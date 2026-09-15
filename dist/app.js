@@ -1,3 +1,4 @@
+import { createAcceptanceWorkspace } from "./acceptance-ui.js";
 import { TaskWorker } from "./task-worker.js";
 import { createProjectNavigator } from "./project-navigator-ui.js";
 import { createLayout } from "./project-navigator.js";
@@ -2429,9 +2430,17 @@ const simulationWorkspace = createSimulationWorkspace({
   getDetector: () => activeDetector,
   onImport: (records) => measurementWorkspace.importSimulationRuns(records),
 });
+const acceptanceWorkspace = createAcceptanceWorkspace();
 const projectNavigator = createProjectNavigator({
+  onRequirements: (records) => acceptanceWorkspace.open(records),
   getProject: () => structuredClone(project),
   onOpen: async (r, records) => {
+    if (
+      ["optibench-requirements", "optibench-acceptance-report"].includes(
+        r.format,
+      )
+    )
+      return acceptanceWorkspace.openRecord(r, records);
     if (r.format === "optibench-layout") {
       checkpoint();
       setProject(r.project);

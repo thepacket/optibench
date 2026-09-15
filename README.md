@@ -159,3 +159,11 @@ Finite analysis workers now show elapsed time and a shared **Cancel analysis** c
 Under **Projects → Local storage**, inspect approximate serialized data sizes, export individual backups, move records to recoverable Trash, or restore them. Trash retains its data and does not free space. Permanent removal is available only from Trash after an explicit confirmation. Independent copies inside project snapshots remain intact. Refresh storage sizes after other workspaces save records. Measurement deletion also moves its record to Trash.
 
 **Simulate → Check sampling stability** compares 64², 128² and 256² independently sampled phase-frame reconstructions at fixed detector extent. The table shows visibility, valid fraction, PV and RMS plus successive differences. Masks and sampled intensity normalization vary with resolution; these are numerical sensitivity checks, not proof of convergence or physical accuracy.
+
+## Requirements and acceptance reports
+
+Open **Projects → Requirements & acceptance**. Name and save an immutable requirements revision, then select a saved sweep or alignment study and **Recompute & evaluate**. Set minimum visibility and valid detector fraction, maximum reconstruction error RMS, optional tolerance-trial fraction/minimum count, and optional maximum absolute successive sampling change. Limits are inclusive.
+
+Each criterion receives **meets**, **fails**, or **insufficient evidence** with its observed value and reason. Known violations take precedence over missing evidence. Sweep records cannot supply tolerance trials. Alignment trials are assessed against the new requirements; failed trials count in the denominator. A regenerated alignment proposal must match its saved layout before it can be assessed. Sampling checks both 64²→128² and 128²→256² for every design case.
+
+Save the report to Projects or export standalone HTML/JSON. Reports retain requirements, source revision, evaluated layouts, settings, fresh metrics and replay checks. Project backups include linked source and requirements records when available. Reopening a report requires a fresh evaluation; historical verdicts are not reused. These reports assess simulated evidence under the recorded model, not laboratory performance or certified yield.
