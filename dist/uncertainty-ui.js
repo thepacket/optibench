@@ -31,7 +31,7 @@ export function createUncertaintyPanel(getContext, download) {
     root;
   function report() {
     if (!budget) return "";
-    return `<h3>Single-acquisition uncertainty · ${budget.simulation ? "simulation" : budget.nonlinear ? "model review" : "declared scope"}</h3>${[
+    return `${budget.restored ? "<p>Archived assessment recomputed using historical operator assertions; review before new use.</p>" : ""}<h3>Single-acquisition uncertainty · ${budget.simulation ? "simulation" : budget.nonlinear ? "model review" : "declared scope"}</h3>${[
       "pv",
       "rms",
     ]
@@ -103,6 +103,13 @@ export function createUncertaintyPanel(getContext, download) {
     invalidate() {
       budget = null;
       verified = false;
+    },
+    restoreRecomputed(value) {
+      calibration = { ...defaults(), ...value?.calibration };
+      budget = value?.budget || null;
+      verified = false;
+      message =
+        "Recomputed archive budget using historical assertions. Review assumptions before new use.";
     },
     restore(value) {
       calibration = { ...defaults(), ...value?.calibration };

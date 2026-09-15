@@ -6,9 +6,12 @@ const database = () =>
           "This browser cannot store experiment runs. Export the run JSON to keep a copy.",
         ),
       );
-    const request = indexedDB.open("optibench-measurements", 1);
-    request.onupgradeneeded = () =>
-      request.result.createObjectStore("runs", { keyPath: "id" });
+    const request = indexedDB.open("optibench-measurements", 2);
+    request.onupgradeneeded = () => {
+      for (const name of ["runs", "archives"])
+        if (!request.result.objectStoreNames.contains(name))
+          request.result.createObjectStore(name, { keyPath: "id" });
+    };
     request.onsuccess = () => resolve(request.result);
     request.onerror = () =>
       reject(
@@ -17,11 +20,11 @@ const database = () =>
     request.onblocked = () =>
       reject(Error("Close other OptiBench tabs to open experiment storage."));
   });
-async function transact(mode, action) {
+async function transact(mode, action, storeName = "runs") {
   const db = await database();
   return new Promise((resolve, reject) => {
-    const tx = db.transaction("runs", mode),
-      req = action(tx.objectStore("runs"));
+    const tx = db.transaction(storeName, mode),
+      req = action(tx.objectStore(storeName));
     let value;
     req.onsuccess = () => {
       value = req.result;
@@ -51,3 +54,9 @@ export const serializable = (value) =>
       ArrayBuffer.isView(v) ? Array.from(v) : v,
     ),
   );
+
+export const archiveStore = {
+  list: () => transact("readonly", (s) => s.getAll(), "archives"),
+  save: (a) => transact("readwrite", (s) => s.add(a), "archives"),
+  remove: (id) => transact("readwrite", (s) => s.delete(id), "archives"),
+};

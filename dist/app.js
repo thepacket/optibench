@@ -2326,6 +2326,10 @@ try {
 } catch {}
 const validationCenter = createValidationCenter();
 const measurementWorkspace = createMetrologyWorkspace({
+  restoreBench: (p) => {
+    checkpoint();
+    setProject(p);
+  },
   getProject: () => structuredClone(project),
   capture: (method) => {
     const field = coherentField(project, activeDetector);
