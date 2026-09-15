@@ -2830,3 +2830,8 @@ dialog::backdrop {
 .validation-card a {color:#8dcaff;}
 .validation-card table {width:100%;font-size:14px;}
 .validation-card th,.validation-card td {text-align:left;padding:8px;border-bottom:1px solid #3b4f61;}
+#simulation-workspace { position:fixed;inset:0;z-index:100;overflow:auto;background:#111923;color:#dfebf5; }
+#simulation-workspace[hidden] {display:none;}
+#simulation-workspace input,#simulation-workspace select {display:block;width:100%;padding:8px;}
+#simulation-workspace table {width:100%;border-collapse:collapse;}
+#simulation-workspace td,#simulation-workspace th {padding:10px;text-align:left;border-bottom:1px solid #3b4f61;}

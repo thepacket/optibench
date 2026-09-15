@@ -1,3 +1,4 @@
+import { createSimulationWorkspace } from "./simulation-ui.js";
 import { createValidationCenter } from "./validation-ui.js";
 import {
   mountModels,
@@ -202,6 +203,7 @@ function mount() {
       ["templates", "book", "Setups"],
       ["design", "bolt", "Design"],
       ["analysis", "chart", "Analysis"],
+      ["simulation-runs", "play", "Simulate"],
       ["measurements", "camera", "Measure"],
       ["validation", "info", "Validate"],
       ["bom", "parts", "Parts"],
@@ -1484,6 +1486,9 @@ function handleClick(e) {
     case "validation":
       validationCenter.open();
       break;
+    case "simulation-runs":
+      simulationWorkspace.open();
+      break;
     case "measurements":
       measurementWorkspace.open();
       break;
@@ -2371,8 +2376,24 @@ const measurementWorkspace = createMetrologyWorkspace({
       frames,
       pixelUm: (width / n) * 1000,
       wavelength: field.wavelength,
+      simulation: {
+        version: "1.0.0",
+        detectorId: activeDetector,
+        n,
+        widthMm: width,
+        normalizationPeak: max,
+        readout:
+          "Ideal normalized intensity: 0.02 + 0.9 × irradiance / capture peak",
+        phaseSteps: [0, 90, 180, 270],
+        noiseSigma: 0,
+      },
     };
   },
+});
+const simulationWorkspace = createSimulationWorkspace({
+  getProject: () => structuredClone(project),
+  getDetector: () => activeDetector,
+  onImport: (records) => measurementWorkspace.importSimulationRuns(records),
 });
 mount();
 if (document.modelContext?.registerTool) {

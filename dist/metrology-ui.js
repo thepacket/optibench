@@ -68,6 +68,7 @@ export function createMetrologyWorkspace({
     archiveLoading = false,
     job = 0,
     sourceProject = null,
+    simulationProvenance = null,
     view = "height",
     worker = null,
     reference = null,
@@ -104,6 +105,7 @@ export function createMetrologyWorkspace({
         throw Error("Wait for analysis to finish before opening an archive.");
       restoreBench(c.bench);
       const r = a.current;
+      simulationProvenance = r.simulation || null;
       frames = r.frames;
       dark = r.dark || null;
       flat = r.flat || null;
@@ -509,6 +511,7 @@ export function createMetrologyWorkspace({
       uncertainty: uncertainty.state(),
       name: name.trim() || "Untitled measurement",
       notes,
+      simulation: simulationProvenance,
       engine: METROLOGY_VERSION,
       frames,
       dark,
@@ -588,6 +591,7 @@ export function createMetrologyWorkspace({
     uncertainty.restore(r.uncertainty);
     acquiredAt = typeof r.acquiredAt === "string" ? r.acquiredAt : "";
     acquisitionId = r.acquisitionId || null;
+    simulationProvenance = r.simulation || null;
     frames = r.frames;
     dark = r.dark ?? null;
     flat = r.flat ?? null;
@@ -721,6 +725,7 @@ export function createMetrologyWorkspace({
         case "demo":
           acquiredAt = "";
           acquisitionId = crypto.randomUUID();
+          simulationProvenance = null;
           frames = demoFrames();
           if (settings.method === "fourier") frames = frames.slice(0, 1);
           dark = flat = null;
@@ -739,6 +744,7 @@ export function createMetrologyWorkspace({
           const captured = capture(settings.method);
           acquiredAt = new Date().toISOString();
           acquisitionId = crypto.randomUUID();
+          simulationProvenance = captured.simulation || null;
           frames = captured.frames;
           dark = flat = null;
           settings = {
@@ -825,7 +831,7 @@ export function createMetrologyWorkspace({
             map = $("#measurement-map").toDataURL("image/png");
           download(
             "optibench-measurement-report.html",
-            `<!doctype html><html lang="en"><meta charset="utf-8"><title>${esc(r.name)}</title><style>body{font:16px system-ui;max-width:900px;margin:40px auto;padding:24px;color:#17212b}table{border-collapse:collapse}td,th{border:1px solid #bbb;padding:8px;text-align:left}img{max-width:512px;width:100%}pre{white-space:pre-wrap}small{color:#555}</style><h1>${esc(r.name)}</h1><p>${esc(r.createdAt)} · OptiBench metrology ${METROLOGY_VERSION}</p><p>${esc(frames[0].origin)} · ${esc(result.unit)} · ${settings.removeTilt ? "fitted plane" : "mean"} removed</p><table><tr><th>PV</th><th>RMS</th><th>Valid area</th><th>Visibility</th></tr><tr><td>${fmt(result.stats.pvNm)} nm</td><td>${fmt(result.stats.rmsNm)} nm</td><td>${fmt(result.stats.validFraction * 100)}%</td><td>${fmt(result.stats.meanVisibility * 100)}%</td></tr></table><h2>${esc(view)} map</h2><img alt="Measurement map" src="${map}"><p>${esc($("#measurement-map-scale").textContent)}</p><p>Acquisition time: ${esc(acquiredAt || "Unknown")}</p><h2>Settings</h2><pre>${esc(JSON.stringify(settings, null, 2))}</pre><h2>Input frames</h2><ul>${frames.map((f) => `<li>${esc(f.name)} · ${f.width} × ${f.height} · ${esc(f.precision || "normalized intensity")} · full scale ${esc(f.fullScale || 1)}</li>`).join("")}</ul><p>Dark: ${esc(dark?.name || "none")} · Flat: ${esc(flat?.name || "none")}</p><h2>Diagnostics</h2><ul>${result.warnings.map((w) => `<li>${esc(w)}</li>`).join("")}</ul><p>Unwrap conflicts: ${result.stats.unwrapConflicts}. Phase-step residual: ${fmt(result.stats.stepResidual, 6)}. PV and RMS are descriptive statistics, not uncertainty bounds. Relative fringe order and calibrated pixel scale remain the experimenter’s responsibility. Single-image phase sign requires a reference. Keep the exported run JSON and original camera files with this report.</p>${qualityHTML()}${uncertainty.report()}${referenceReport()}<h2>Cross-section</h2>${profileSVG()}<h2>Notes</h2><pre>${esc(notes)}</pre></html>`,
+            `<!doctype html><html lang="en"><meta charset="utf-8"><title>${esc(r.name)}</title><style>body{font:16px system-ui;max-width:900px;margin:40px auto;padding:24px;color:#17212b}table{border-collapse:collapse}td,th{border:1px solid #bbb;padding:8px;text-align:left}img{max-width:512px;width:100%}pre{white-space:pre-wrap}small{color:#555}</style><h1>${esc(r.name)}</h1><p>${esc(r.createdAt)} · OptiBench metrology ${METROLOGY_VERSION}</p><p>${esc(frames[0].origin)} · ${esc(result.unit)} · ${settings.removeTilt ? "fitted plane" : "mean"} removed</p><table><tr><th>PV</th><th>RMS</th><th>Valid area</th><th>Visibility</th></tr><tr><td>${fmt(result.stats.pvNm)} nm</td><td>${fmt(result.stats.rmsNm)} nm</td><td>${fmt(result.stats.validFraction * 100)}%</td><td>${fmt(result.stats.meanVisibility * 100)}%</td></tr></table><h2>${esc(view)} map</h2><img alt="Measurement map" src="${map}"><p>${esc($("#measurement-map-scale").textContent)}</p><p>Acquisition time: ${esc(acquiredAt || "Unknown")}</p><h2>Settings</h2><pre>${esc(JSON.stringify(settings, null, 2))}</pre>${simulationProvenance ? `<h2>Simulation provenance</h2><pre>${esc(JSON.stringify(simulationProvenance, null, 2))}</pre>` : ""}<h2>Input frames</h2><ul>${frames.map((f) => `<li>${esc(f.name)} · ${f.width} × ${f.height} · ${esc(f.precision || "normalized intensity")} · full scale ${esc(f.fullScale || 1)}</li>`).join("")}</ul><p>Dark: ${esc(dark?.name || "none")} · Flat: ${esc(flat?.name || "none")}</p><h2>Diagnostics</h2><ul>${result.warnings.map((w) => `<li>${esc(w)}</li>`).join("")}</ul><p>Unwrap conflicts: ${result.stats.unwrapConflicts}. Phase-step residual: ${fmt(result.stats.stepResidual, 6)}. PV and RMS are descriptive statistics, not uncertainty bounds. Relative fringe order and calibrated pixel scale remain the experimenter’s responsibility. Single-image phase sign requires a reference. Keep the exported run JSON and original camera files with this report.</p>${qualityHTML()}${uncertainty.report()}${referenceReport()}<h2>Cross-section</h2>${profileSVG()}<h2>Notes</h2><pre>${esc(notes)}</pre></html>`,
             "text/html",
           );
           return;
@@ -971,6 +977,7 @@ export function createMetrologyWorkspace({
           throw Error("All four frames must have the same dimensions.");
         acquiredAt = "";
         acquisitionId = crypto.randomUUID();
+        simulationProvenance = null;
         frames = decoded;
         dark = flat = null;
         sourceProject = structuredClone(getProject());
@@ -1019,5 +1026,18 @@ export function createMetrologyWorkspace({
       importing = false;
     }
   }
-  return { open };
+  return {
+    open,
+    async importSimulationRuns(records) {
+      if (busy || importing)
+        throw Error("Wait for the measurement workspace to finish.");
+      for (const r of records) await store.save(r);
+      open();
+      await refreshRuns();
+      if (records.length) await loadRecord(records[0]);
+      status(
+        "Controlled simulation acquisitions saved. Each run retains its exact modified bench and readout parameters. Sweep points are different conditions, not repeat acquisitions.",
+      );
+    },
+  };
 }

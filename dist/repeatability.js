@@ -42,6 +42,18 @@ export function analyzeRepeats(runs, { verified = false } = {}) {
     throw Error("Choose 3–20 saved acquisitions.");
   if (new Set(runs.map((r) => r.id)).size !== runs.length)
     throw Error("Select distinct saved runs.");
+  const sweeps = runs.filter((r) => r.simulation?.studyId);
+  if (
+    sweeps.length > 1 &&
+    new Set(
+      sweeps.map((r) =>
+        JSON.stringify([r.simulation.parameter, r.simulation.value]),
+      ),
+    ).size > 1
+  )
+    throw Error(
+      "Controlled sweep points change measurement conditions and cannot be treated as independent repeats.",
+    );
   const acquisitionIds = runs.map((r) => r.acquisitionId).filter(Boolean);
   if (new Set(acquisitionIds).size !== acquisitionIds.length)
     throw Error(
