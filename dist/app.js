@@ -1,3 +1,4 @@
+import { createGuidedWorkspace } from "./guided-ui.js";
 import { createAcceptanceWorkspace } from "./acceptance-ui.js";
 import { TaskWorker } from "./task-worker.js";
 import { createProjectNavigator } from "./project-navigator-ui.js";
@@ -206,6 +207,7 @@ function mount() {
     `<header class="app-header"><a class="brand" href="#" aria-label="OptiBench">${icon("lens", 31)}<strong>opti<span>bench</span></strong><small>LAB</small></a><div class="project-heading">${icon("folder")}<button data-action="project">${esc(project.title)}</button><span class="local-badge">LOCAL PROJECT</span></div><div class="top-actions">${button("open", "Open", "folder")}${button("save", "Save file", "save", "outline")}${iconButton("guide", "Model documentation & keyboard shortcuts", "book")}</div></header><div class="app-layout"><nav class="rail" aria-label="Workspace navigation">${[
       ["bench", "table", "Bench"],
       ["projects", "folder", "Projects"],
+      ["first-experiment", "play", "First lab"],
       ["library", "lens", "Catalog"],
       ["templates", "book", "Setups"],
       ["design", "bolt", "Design"],
@@ -1493,6 +1495,9 @@ function handleClick(e) {
     case "validation":
       validationCenter.open();
       break;
+    case "first-experiment":
+      guidedWorkspace.open();
+      break;
     case "projects":
       projectNavigator.open();
       break;
@@ -2429,6 +2434,10 @@ const simulationWorkspace = createSimulationWorkspace({
   getProject: () => structuredClone(project),
   getDetector: () => activeDetector,
   onImport: (records) => measurementWorkspace.importSimulationRuns(records),
+});
+const guidedWorkspace = createGuidedWorkspace({
+  onBench: p => { checkpoint(); setProject(p); },
+  onMeasure: r => measurementWorkspace.openRecord(r),
 });
 const acceptanceWorkspace = createAcceptanceWorkspace();
 const projectNavigator = createProjectNavigator({

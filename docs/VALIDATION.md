@@ -200,3 +200,7 @@ Automated regression tests verify transaction rollback across IndexedDB stores, 
 ## v0.17 requirements and acceptance
 
 Acceptance tests cover inclusive boundaries, known failures with missing evidence, minimum trial counts, failed-trial denominators, both adjacent sampling changes, missing grids, recomputation of tampered cached sweep metrics, report dependency backup closure, HTML escaping, invalid limits and immutable requirement revisions. A real alignment replay verifies saved-proposal identity and refuses a changed saved layout. Acceptance is simulation-based; numerical checks do not establish physical accuracy or sampling convergence.
+
+## v0.18 guided Michelson experiment
+
+A full workflow test verifies nine completed acquisitions, a nonconstant center intensity returning to its initial value after one piston cycle, a freshly recomputed acceptance result with nine sampling checks, unchanged source inputs and a valid 13-record project backup with no missing references. A UI test checks step gating and explicit, reversible bench loading. No physical equipment validation is implied.
