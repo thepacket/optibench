@@ -220,3 +220,7 @@ Added end-to-end optical fixtures for Gaussian free-space radius, 13-ray thin-le
 ### Native-pixel Michelson instrument acquisitions
 
 `instrument-lab.test.js` checks exact agreement with the shared camera response on the native central ROI, reproducibility for recorded seeds, differing samples for new seeds, approximately doubled unsaturated signal for doubled exposure, saturated-frame diagnostics, source-data reconstruction and repeat-condition/seed rejection. `instrument-ui.test.js` exercises acquisition, hidden/explicit truth, settings changes, repeats, local save and restoration. These are synthetic software checks. They do not establish physical camera calibration, pixel-integrated diffraction accuracy, phase-actuator accuracy, environmental drift or experimental uncertainty.
+
+### Power-meter instrument
+
+Power-meter tests cover Gaussian power capture, wavelength-setting response, raw overload before zero subtraction, shutter-based zero calibration and invalidation, deterministic noise, variance reduction through averaging, integrated Michelson piston interference, and the save/history UI workflow. The response curve and electrical noise/offset are illustrative assumptions. These software checks do not establish physical instrument calibration or a complete uncertainty budget.

@@ -2932,3 +2932,4 @@ dialog::backdrop {
 .instrument-warning{border-left:3px solid #e9b86f;padding-left:12px}
 .instrument-truth{padding:12px;border:1px dashed #657c93;margin:16px 0}
 @media(max-width:900px){.instrument-grid,.instrument-readout{grid-template-columns:1fr}.instrument-readout figure{max-width:360px}.instrument-main{padding:16px}}
+#power-workspace{position:fixed;inset:0;z-index:130;background:#111923;color:#dfebf5;overflow:auto}#power-workspace[hidden]{display:none}.power-readout{font:clamp(24px,4vw,54px) 'Space Grotesk',sans-serif;color:#b7e97d;background:#0b141b;border:1px solid #45586c;padding:24px;margin:16px 0;font-variant-numeric:tabular-nums}#power-workspace input[type=checkbox]{display:inline-block;width:auto}
