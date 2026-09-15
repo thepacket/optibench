@@ -1,3 +1,5 @@
+import { showWorkspace, closeWorkspace } from "./workspace-state.js";
+import { TaskWorker } from "./task-worker.js";
 import { createArchivePanel } from "./archive-ui.js";
 import { createUncertaintyPanel } from "./uncertainty-ui.js";
 import { measurementQuality } from "./measurement-quality.js";
@@ -18,7 +20,7 @@ import {
   measurementCSV,
   METROLOGY_VERSION,
 } from "./metrology.js";
-import { runStore, serializable } from "./run-store.js";
+import { runStore, serializable, changeStoredRecord } from "./run-store.js";
 const esc = (v) =>
   String(v ?? "").replace(
     /[&<>"']/g,
@@ -177,11 +179,13 @@ export function createMetrologyWorkspace({
     const app = document.querySelector("#app");
     if (app) app.inert = true;
     if (root) {
-      root.hidden = false;
+      showWorkspace(root);
+      render();
       return;
     }
     root = document.createElement("section");
     root.id = "measurement-workspace";
+    showWorkspace(root);
     root.setAttribute("aria-label", "Fringe measurement workspace");
     document.body.appendChild(root);
     root.addEventListener("click", handleClick);
@@ -191,7 +195,7 @@ export function createMetrologyWorkspace({
     archivePanel.refresh();
   }
   function render() {
-    root.innerHTML = `<header class="measurement-header"><button data-measure="close">← Optical bench</button><div><span class="measurement-kicker">OPTIBENCH / METROLOGY</span><h1>Fringe measurements</h1></div><button data-measure="import-run">Open run JSON</button><button data-measure="export-run" ${result ? "" : "disabled"}>Export run</button><button data-measure="save" class="measurement-primary" ${result ? "" : "disabled"}>Save experiment</button></header><div class="measurement-grid"><aside class="measurement-controls"><section><h2>1. Image source</h2><label>Reconstruction<select data-setting="method"><option value="four-step" ${settings.method === "four-step" ? "selected" : ""}>Four frames · 0°, 90°, 180°, 270°</option><option value="fourier" ${settings.method === "fourier" ? "selected" : ""}>Single image · Fourier sideband</option></select></label><div class="measurement-buttons"><button data-measure="import-frames">Import ${settings.method === "four-step" ? "4 frames" : "image"}</button><button data-measure="capture">Capture simulation</button><button data-measure="demo">Load example</button></div><p class="measurement-help">TIFF · unsigned monochrome 8/16-bit; numerical JSON · full-precision samples. PNG/JPEG/WebP · decoded 8-bit luminance. 64–2048 px per side, no resizing. Use linear intensity. <button data-measure="image-template">Numerical JSON template</button></p><div class="measurement-frame-list">${frames.length ? frames.map((f, i) => `<div><b>${settings.method === "four-step" ? i * 90 + "°" : "Frame"}</b><span title="${esc(f.name)}">${esc(f.name)}<small>${f.width} × ${f.height} · ${esc(f.origin)} · ${esc(f.precision || "normalized intensity")}</small></span>${i ? `<button data-measure="frame-up" data-index="${i}" aria-label="Move frame earlier">↑</button>` : ""}</div>`).join("") : '<p class="measurement-help">No frames loaded. Import laboratory images or try the example.</p>'}</div><div class="measurement-buttons"><button data-measure="dark">${dark ? "Replace" : "Add"} dark</button><button data-measure="flat">${flat ? "Replace" : "Add"} flat</button>${dark || flat ? '<button data-measure="clear-calibration">Clear calibration</button>' : ""}</div><p class="measurement-help">${dark ? "Dark: " + esc(dark.name) : "No dark subtraction"}<br>${flat ? "Flat: " + esc(flat.name) : "No flat-field correction"}</p></section><section><h2>2. ROI & calibration</h2><label>Square ROI size<select data-setting="n">${[64, 128, 256, 512].map((n) => `<option ${n === settings.n ? "selected" : ""}>${n}</option>`).join("")}</select></label><div class="measurement-two">${numberField("Origin X · px", "x", settings.x, 0, 2047, 1)}${numberField("Origin Y · px", "y", settings.y, 0, 2047, 1)}</div>${numberField("Object-plane scale · µm / pixel", "pixelUm", settings.pixelUm, 0.000001, 100000)}${numberField("Wavelength · nm", "wavelength", settings.wavelength, 200, 20000)}<label>Conversion<select data-setting="geometry"><option value="opd" ${settings.geometry === "opd" ? "selected" : ""}>Optical path difference</option><option value="reflection" ${settings.geometry === "reflection" ? "selected" : ""}>Reflecting-surface height</option></select></label>${settings.geometry === "reflection" ? numberField("Incidence from surface normal · °", "incidence", settings.incidence, 0, 80) : ""}${numberField("Minimum visibility · 0–1", "minVisibility", settings.minVisibility, 0.01, 0.95, 0.01)}<label class="measurement-check"><input data-setting="removeTilt" type="checkbox" ${settings.removeTilt ? "checked" : ""}>Remove fitted tilt and piston</label><p class="measurement-help">${settings.removeTilt ? "Best-fit plane removed." : "Only mean phase removed."} Heights and OPD are relative; absolute fringe order is unknown.</p>${settings.method === "fourier" ? `<label class="measurement-check"><input data-setting="autoCarrier" type="checkbox" ${settings.autoCarrier ? "checked" : ""}>Find carrier automatically</label><div class="measurement-two">${numberField("Carrier X · bins", "carrierX", settings.carrierX, -256, 256)}${numberField("Carrier Y · bins", "carrierY", settings.carrierY, -256, 256)}</div>${numberField("Sideband radius · bins", "bandwidth", settings.bandwidth, 1, 32)}<p class="measurement-help">Manual signed carrier bins select the conjugate sideband and phase sign. A circular tapered filter must separate the sideband from DC.</p>` : ""}<button class="measurement-primary measurement-analyze" data-measure="analyze" ${busy ? "disabled" : ""}>${busy ? "Reconstructing…" : "Reconstruct phase"}</button></section></aside><main class="measurement-main"><div class="measurement-title"><label>Experiment name<input id="measurement-name" value="${esc(name)}" maxlength="120"></label><span class="measurement-badge">${frames.length ? esc(frames[0].origin) : "Awaiting image data"}</span></div><div class="measurement-status" id="measurement-status" role="status">${esc(message || "Import images, select a region and reconstruct phase.")}</div><div class="measurement-instruments"><article><header><h2>Input & region</h2><span>${frames[0] ? frames[0].width + " × " + frames[0].height + " px" : "—"}</span></header><canvas id="measurement-input" aria-label="Input fringe image and selected ROI"></canvas><p>ROI: (${settings.x}, ${settings.y}) · ${settings.n}² native pixels · ${fmt((settings.n * settings.pixelUm) / 1000, 3)} mm wide</p></article><article><header><h2>Reconstruction</h2><select id="measurement-view" aria-label="Map display">${[
+    root.innerHTML = `<header class="measurement-header"><button data-measure="close">← Optical bench</button><div><span class="measurement-kicker">OPTIBENCH / METROLOGY</span><h1>Fringe measurements</h1></div><button data-measure="import-run">Open run JSON</button><button data-measure="export-run" ${result ? "" : "disabled"}>Export run</button><button data-measure="save" class="measurement-primary" ${result ? "" : "disabled"}>Save experiment</button></header><p class="measurement-help">${sourceProject ? (JSON.stringify(sourceProject) === JSON.stringify(getProject()) ? "Source layout matches the active bench." : "Measurement belongs to a different recorded layout; changing the active bench does not update these frames.") : "No source bench is linked to these frames."}</p><div class="measurement-grid"><aside class="measurement-controls"><section><h2>1. Image source</h2><label>Reconstruction<select data-setting="method"><option value="four-step" ${settings.method === "four-step" ? "selected" : ""}>Four frames · 0°, 90°, 180°, 270°</option><option value="fourier" ${settings.method === "fourier" ? "selected" : ""}>Single image · Fourier sideband</option></select></label><div class="measurement-buttons"><button data-measure="import-frames">Import ${settings.method === "four-step" ? "4 frames" : "image"}</button><button data-measure="capture">Capture simulation</button><button data-measure="demo">Load example</button></div><p class="measurement-help">TIFF · unsigned monochrome 8/16-bit; numerical JSON · full-precision samples. PNG/JPEG/WebP · decoded 8-bit luminance. 64–2048 px per side, no resizing. Use linear intensity. <button data-measure="image-template">Numerical JSON template</button></p><div class="measurement-frame-list">${frames.length ? frames.map((f, i) => `<div><b>${settings.method === "four-step" ? i * 90 + "°" : "Frame"}</b><span title="${esc(f.name)}">${esc(f.name)}<small>${f.width} × ${f.height} · ${esc(f.origin)} · ${esc(f.precision || "normalized intensity")}</small></span>${i ? `<button data-measure="frame-up" data-index="${i}" aria-label="Move frame earlier">↑</button>` : ""}</div>`).join("") : '<p class="measurement-help">No frames loaded. Import laboratory images or try the example.</p>'}</div><div class="measurement-buttons"><button data-measure="dark">${dark ? "Replace" : "Add"} dark</button><button data-measure="flat">${flat ? "Replace" : "Add"} flat</button>${dark || flat ? '<button data-measure="clear-calibration">Clear calibration</button>' : ""}</div><p class="measurement-help">${dark ? "Dark: " + esc(dark.name) : "No dark subtraction"}<br>${flat ? "Flat: " + esc(flat.name) : "No flat-field correction"}</p></section><section><h2>2. ROI & calibration</h2><label>Square ROI size<select data-setting="n">${[64, 128, 256, 512].map((n) => `<option ${n === settings.n ? "selected" : ""}>${n}</option>`).join("")}</select></label><div class="measurement-two">${numberField("Origin X · px", "x", settings.x, 0, 2047, 1)}${numberField("Origin Y · px", "y", settings.y, 0, 2047, 1)}</div>${numberField("Object-plane scale · µm / pixel", "pixelUm", settings.pixelUm, 0.000001, 100000)}${numberField("Wavelength · nm", "wavelength", settings.wavelength, 200, 20000)}<label>Conversion<select data-setting="geometry"><option value="opd" ${settings.geometry === "opd" ? "selected" : ""}>Optical path difference</option><option value="reflection" ${settings.geometry === "reflection" ? "selected" : ""}>Reflecting-surface height</option></select></label>${settings.geometry === "reflection" ? numberField("Incidence from surface normal · °", "incidence", settings.incidence, 0, 80) : ""}${numberField("Minimum visibility · 0–1", "minVisibility", settings.minVisibility, 0.01, 0.95, 0.01)}<label class="measurement-check"><input data-setting="removeTilt" type="checkbox" ${settings.removeTilt ? "checked" : ""}>Remove fitted tilt and piston</label><p class="measurement-help">${settings.removeTilt ? "Best-fit plane removed." : "Only mean phase removed."} Heights and OPD are relative; absolute fringe order is unknown.</p>${settings.method === "fourier" ? `<label class="measurement-check"><input data-setting="autoCarrier" type="checkbox" ${settings.autoCarrier ? "checked" : ""}>Find carrier automatically</label><div class="measurement-two">${numberField("Carrier X · bins", "carrierX", settings.carrierX, -256, 256)}${numberField("Carrier Y · bins", "carrierY", settings.carrierY, -256, 256)}</div>${numberField("Sideband radius · bins", "bandwidth", settings.bandwidth, 1, 32)}<p class="measurement-help">Manual signed carrier bins select the conjugate sideband and phase sign. A circular tapered filter must separate the sideband from DC.</p>` : ""}<button class="measurement-primary measurement-analyze" data-measure="analyze" ${busy ? "disabled" : ""}>${busy ? "Reconstructing…" : "Reconstruct phase"}</button></section></aside><main class="measurement-main"><div class="measurement-title"><label>Experiment name<input id="measurement-name" value="${esc(name)}" maxlength="120"></label><span class="measurement-badge">${frames.length ? esc(frames[0].origin) : "Awaiting image data"}</span></div><div class="measurement-status" id="measurement-status" role="status">${esc(message || "Import images, select a region and reconstruct phase.")}</div><div class="measurement-instruments"><article><header><h2>Input & region</h2><span>${frames[0] ? frames[0].width + " × " + frames[0].height + " px" : "—"}</span></header><canvas id="measurement-input" aria-label="Input fringe image and selected ROI"></canvas><p>ROI: (${settings.x}, ${settings.y}) · ${settings.n}² native pixels · ${fmt((settings.n * settings.pixelUm) / 1000, 3)} mm wide</p></article><article><header><h2>Reconstruction</h2><select id="measurement-view" aria-label="Map display">${[
       ["height", "Relative nm"],
       ["difference", "Sample − reference nm"],
       ["phase", "Unwrapped rad"],
@@ -227,7 +231,7 @@ export function createMetrologyWorkspace({
   function renderRuns() {
     if (!$("#measurement-runs")) return;
     $("#measurement-runs").innerHTML = runs.length
-      ? `<div class="measurement-table-scroll"><table><thead><tr><th>Compare / Repeat</th><th>Experiment</th><th>Source / method</th><th>PV / RMS (nm)</th><th>Valid</th><th>Actions</th></tr></thead><tbody>${runs.map((r) => `<tr><td><input type="checkbox" data-run-compare="${esc(r.id)}" aria-label="Compare ${esc(r.name)}" ${selectedRuns.has(r.id) ? "checked" : ""}><label class="measurement-check"><input type="checkbox" data-repeat-id="${esc(r.id)}" ${repeatIds.has(r.id) ? "checked" : ""}>Repeat</label></td><td>${esc(r.name)}<small>${esc(new Date(r.createdAt).toLocaleString())}</small></td><td>${esc(r.frames[0]?.origin)}<small>${esc(r.settings.method)} · ${esc(r.settings.geometry)}</small></td><td>${fmt(r.result.stats.pvNm)} / ${fmt(r.result.stats.rmsNm)}</td><td>${fmt(r.result.stats.validFraction * 100, 1)}%</td><td><button data-measure="load-run" data-id="${esc(r.id)}">Open</button><button data-measure="delete-run" data-id="${esc(r.id)}">Delete</button></td></tr>`).join("")}</tbody></table></div><div id="measurement-comparison"></div>`
+      ? `<div class="measurement-table-scroll"><table><thead><tr><th>Compare / Repeat</th><th>Experiment</th><th>Source / method</th><th>PV / RMS (nm)</th><th>Valid</th><th>Actions</th></tr></thead><tbody>${runs.map((r) => `<tr><td><input type="checkbox" data-run-compare="${esc(r.id)}" aria-label="Compare ${esc(r.name)}" ${selectedRuns.has(r.id) ? "checked" : ""}><label class="measurement-check"><input type="checkbox" data-repeat-id="${esc(r.id)}" ${repeatIds.has(r.id) ? "checked" : ""}>Repeat</label></td><td>${esc(r.name)}<small>${esc(new Date(r.createdAt).toLocaleString())}</small></td><td>${esc(r.frames[0]?.origin)}<small>${esc(r.settings.method)} · ${esc(r.settings.geometry)}</small></td><td>${fmt(r.result.stats.pvNm)} / ${fmt(r.result.stats.rmsNm)}</td><td>${fmt(r.result.stats.validFraction * 100, 1)}%</td><td><button data-measure="load-run" data-id="${esc(r.id)}">Open</button><button data-measure="delete-run" data-id="${esc(r.id)}">Move to Trash</button></td></tr>`).join("")}</tbody></table></div><div id="measurement-comparison"></div>`
       : '<p class="measurement-help">Save a reconstruction to preserve its images, calibration, setup and results.</p>';
     renderStudy();
     const pair = runs.filter((r) => selectedRuns.has(r.id));
@@ -242,7 +246,7 @@ export function createMetrologyWorkspace({
     const selected = runs.filter((r) => repeatIds.has(r.id));
     if (typeof Worker === "undefined")
       return analyzeRepeats(selected, { verified: repeatVerified });
-    const w = new Worker(
+    const w = new TaskWorker(
       new URL("./repeatability-worker.js", import.meta.url),
       { type: "module" },
     );
@@ -544,9 +548,12 @@ export function createMetrologyWorkspace({
         output = analyzeMeasurement(frames, settings, { dark, flat });
       else {
         if (worker) worker.terminate();
-        worker = new Worker(new URL("./metrology-worker.js", import.meta.url), {
-          type: "module",
-        });
+        worker = new TaskWorker(
+          new URL("./metrology-worker.js", import.meta.url),
+          {
+            type: "module",
+          },
+        );
         output = await new Promise((resolve, reject) => {
           worker.onmessage = ({ data }) =>
             data.error ? reject(Error(data.error)) : resolve(data.result);
@@ -807,7 +814,12 @@ export function createMetrologyWorkspace({
           await loadRecord(runs.find((r) => r.id === b.dataset.id));
           return;
         case "delete-run":
-          await store.remove(b.dataset.id);
+          if (store === runStore)
+            await changeStoredRecord(
+              "trash",
+              runs.find((r) => r.id === b.dataset.id),
+            );
+          else await store.remove(b.dataset.id);
           attachedRuns = attachedRuns.filter((r) => r.id !== b.dataset.id);
           selectedRuns.delete(b.dataset.id);
           repeatIds.delete(b.dataset.id);
@@ -816,7 +828,7 @@ export function createMetrologyWorkspace({
           repeatVerified = false;
           await refreshRuns();
           status(
-            "Saved experiment deleted. The currently loaded data remains available.",
+            "Saved experiment moved to Trash in Projects. The currently loaded data remains available.",
           );
           return;
         case "csv":

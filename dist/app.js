@@ -1,3 +1,4 @@
+import { TaskWorker } from "./task-worker.js";
 import { createProjectNavigator } from "./project-navigator-ui.js";
 import { createLayout } from "./project-navigator.js";
 import { archiveStore } from "./run-store.js";
@@ -229,7 +230,7 @@ function mount() {
       )
       .join(
         "",
-      )}</div><div class="results-tools"><select id="detector-select" aria-label="Active detector"></select>${iconButton("export-results", "Export numerical results", "download")}${iconButton("collapse-results", "Collapse or expand results", "chevron")}</div></div><div id="results-body"></div></section><footer><span id="trace-status"></span><span id="save-state">${saveStatus}</span><span>OptiBench ${ENGINE_VERSION}</span></footer></main><aside class="inspector panel" id="inspector-panel"><div class="panel-title"><h2>Component inspector</h2>${iconButton("close-drawer", "Close inspector", "close", "drawer-close")}</div><div id="inspector-body"></div></aside></div><div id="toast" role="status"></div><div id="drawer-scrim" hidden></div><dialog id="dialog"><div class="dialog-heading"><h2 id="dialog-title"></h2>${iconButton("close-dialog", "Close dialog", "close")}</div><div id="dialog-body"></div></dialog><input hidden id="project-file" type="file" accept=".json,application/json"><input hidden id="catalog-file" type="file" accept=".json,application/json"><input hidden id="image-file" type="file" accept="image/png,image/jpeg,image/webp">`;
+      )}</div><div class="results-tools"><select id="detector-select" aria-label="Active detector"></select>${iconButton("export-results", "Export numerical results", "download")}${iconButton("collapse-results", "Collapse or expand results", "chevron")}</div></div><div id="results-body"></div></section><footer><span id="trace-status"></span><span id="save-state">${saveStatus}</span><span>OptiBench · engine ${ENGINE_VERSION}</span></footer></main><aside class="inspector panel" id="inspector-panel"><div class="panel-title"><h2>Component inspector</h2>${iconButton("close-drawer", "Close inspector", "close", "drawer-close")}</div><div id="inspector-body"></div></aside></div><div id="toast" role="status"></div><div id="drawer-scrim" hidden></div><dialog id="dialog"><div class="dialog-heading"><h2 id="dialog-title"></h2>${iconButton("close-dialog", "Close dialog", "close")}</div><div id="dialog-body"></div></dialog><input hidden id="project-file" type="file" accept=".json,application/json"><input hidden id="catalog-file" type="file" accept=".json,application/json"><input hidden id="image-file" type="file" accept="image/png,image/jpeg,image/webp">`;
   bind();
   compute();
   renderPanels();
@@ -2252,7 +2253,7 @@ async function handleSubmit(e) {
           focal: num("focal"),
           seed: num("seed"),
         };
-        const analysisWorker = new Worker("./analysis-worker.js", {
+        const analysisWorker = new TaskWorker("./analysis-worker.js", {
           type: "module",
         });
         const captured = structuredClone(project),
@@ -2452,9 +2453,12 @@ const projectNavigator = createProjectNavigator({
         throw Error(
           "Both source sweep revisions must be available to recompute this comparison. Import their project backup first.",
         );
-      const w = new Worker(new URL("./simulation-worker.js", import.meta.url), {
-        type: "module",
-      });
+      const w = new TaskWorker(
+        new URL("./simulation-worker.js", import.meta.url),
+        {
+          type: "module",
+        },
+      );
       try {
         return await new Promise((resolve, reject) => {
           w.onmessage = ({ data }) =>

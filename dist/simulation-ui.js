@@ -1,3 +1,6 @@
+import { checkSampling, samplingHTML } from "./sampling-check.js";
+import { showWorkspace, closeWorkspace } from "./workspace-state.js";
+import { TaskWorker } from "./task-worker.js";
 import { compareStudies } from "./study-comparison.js";
 import { comparisonHTML } from "./study-comparison-ui.js";
 import { reopenSimulationStudy, createSweepArchive } from "./sweep-archive.js";
@@ -29,6 +32,7 @@ export function createSimulationWorkspace({
 }) {
   let root,
     study = null,
+    sampling = null,
     comparison = null,
     compareA = "",
     compareB = "",
@@ -53,7 +57,7 @@ export function createSimulationWorkspace({
     };
   function render() {
     const p = workingProject || getProject();
-    root.innerHTML = `<header class="measurement-header"><button data-sim="close">← Optical bench</button><h1>Controlled simulation runs</h1><button data-sim="alignment">Alignment & tolerances</button><button data-sim="open-file" ${busy ? "disabled" : ""}>Open study / archive</button><button data-sim="current" ${busy ? "disabled" : ""}>Use current bench</button><button data-sim="run" ${busy ? "disabled" : ""}>${busy ? "Simulating…" : "Run sweep"}</button><button data-sim="export" ${study && !busy ? "" : "disabled"}>Export complete study</button><button data-sim="measure" ${study?.rows.some((r) => r.run) && !busy ? "" : "disabled"}>Save acquisitions & measure</button></header><main class="validation-main"><p>Study bench: <b>${esc(p.title)}</b>. Change one parameter across this frozen copy; use “Use current bench” to start from the active layout. Every acquisition retains its modified layout, normalization, seeds and analysis settings.</p><div class="measurement-two"><label>Parameter<select data-config="parameter">${[
+    root.innerHTML = `<header class="measurement-header"><button data-sim="close">← Optical bench</button><h1>Controlled simulation runs</h1><button data-sim="sampling" ${busy ? "disabled" : ""}>Check sampling stability</button><button data-sim="alignment">Alignment & tolerances</button><button data-sim="open-file" ${busy ? "disabled" : ""}>Open study / archive</button><button data-sim="current" ${busy ? "disabled" : ""}>Use current bench</button><button data-sim="run" ${busy ? "disabled" : ""}>${busy ? "Simulating…" : "Run sweep"}</button><button data-sim="export" ${study && !busy ? "" : "disabled"}>Export complete study</button><button data-sim="measure" ${study?.rows.some((r) => r.run) && !busy ? "" : "disabled"}>Save acquisitions & measure</button></header><main class="validation-main"><p>Study bench: <b>${esc(p.title)}</b>. <strong>${JSON.stringify(p) === JSON.stringify(getProject()) ? "Matches active bench" : "Different from active bench — results belong to the frozen study"}</strong>. Change one parameter across this frozen copy; use “Use current bench” to start from the active layout. Every acquisition retains its modified layout, normalization, seeds and analysis settings.</p><div class="measurement-two"><label>Parameter<select data-config="parameter">${[
       ["piston", "Mirror piston · nm (absolute)"],
       ["angle", "Mirror angle offset · degrees"],
       ["exposure", "Relative exposure multiplier"],
@@ -81,7 +85,15 @@ export function createSimulationWorkspace({
       )
       .join(
         "",
-      )}</select></label>${["start", "end", "count", "seed"].map((key) => `<label>${key}<input data-config="${key}" type="number" step="any" value="${config[key]}"></label>`).join("")}</div><p role="status">${esc(message)}</p><p>128² sample grid. Exposure and noise use an illustrative normalized-intensity readout, not the camera hardware model. Shared seeds isolate parameter effects; these runs are not independent repeats.</p>${study ? `<h2>${esc(study.config.parameter)} comparison</h2>${plot()}<div class="measurement-table-scroll"><table><thead><tr><th>Value</th><th>Status</th><th>Center intensity · frame 0</th><th>Visibility</th><th>PV / RMS · nm</th><th>Error RMS · nm</th><th>Valid area</th></tr></thead><tbody>${study.rows.map((r) => `<tr><td>${fmt(r.value)}</td><td>${esc(r.error || r.status)}</td><td>${fmt(r.intensity)}</td><td>${fmt(r.visibility)}</td><td>${fmt(r.pvNm)} / ${fmt(r.rmsNm)}</td><td>${fmt(r.errorRMSNm)}</td><td>${fmt(r.validFraction == null ? null : r.validFraction * 100)}%</td></tr>${r.warnings?.length ? `<tr><td colspan="7">${r.warnings.map(esc).join(" · ")}</td></tr>` : ""}`).join("")}</tbody></table></div>${study.notes.map((n) => `<p>${esc(n)}</p>`).join("")}` : ""}${historyHTML()}${comparisonPanel()}</main><input id="simulation-file" type="file" accept=".json" hidden>`;
+      )}</select></label>${["start", "end", "count", "seed"].map((key) => `<label>${key}<input data-config="${key}" type="number" step="any" value="${config[key]}"></label>`).join("")}</div><p role="status">${esc(message)}</p><p>128² sample grid. Exposure and noise use an illustrative normalized-intensity readout, not the camera hardware model. Shared seeds isolate parameter effects; these runs are not independent repeats.</p>${study ? `<h2>${esc(study.config.parameter)} comparison</h2>${plot()}<div class="measurement-table-scroll"><table><thead><tr><th>Value</th><th>Status</th><th>Center intensity · frame 0</th><th>Visibility</th><th>PV / RMS · nm</th><th>Error RMS · nm</th><th>Valid area</th></tr></thead><tbody>${study.rows.map((r) => `<tr><td>${fmt(r.value)}</td><td>${esc(r.error || r.status)}</td><td>${fmt(r.intensity)}</td><td>${fmt(r.visibility)}</td><td>${fmt(r.pvNm)} / ${fmt(r.rmsNm)}</td><td>${fmt(r.errorRMSNm)}</td><td>${fmt(r.validFraction == null ? null : r.validFraction * 100)}%</td></tr>${r.warnings?.length ? `<tr><td colspan="7">${r.warnings.map(esc).join(" · ")}</td></tr>` : ""}`).join("")}</tbody></table></div>${study.notes.map((n) => `<p>${esc(n)}</p>`).join("")}` : ""}${sampling ? samplingHTML(sampling) : ""}${historyHTML()}${comparisonPanel()}</main><input id="simulation-file" type="file" accept=".json" hidden>`;
+    root.oninput = (e) => {
+      if (e.target.dataset.revision && !busy) {
+        const key = e.target.dataset.revision;
+        if (key === "title") title = e.target.value;
+        if (key === "name") revisionName = e.target.value;
+        if (key === "notes") revisionNotes = e.target.value;
+      }
+    };
     root.onchange = async (e) => {
       if (busy) return;
       if (e.target.dataset.compare) {
@@ -130,6 +142,7 @@ export function createSimulationWorkspace({
         [config.start, config.end] = defaults;
       }
       study = null;
+      sampling = null;
       verification = null;
       render();
     };
@@ -143,7 +156,40 @@ export function createSimulationWorkspace({
         return;
       }
       if (busy) return;
+      if (a === "open-file") {
+        root.querySelector("#simulation-file").click();
+        return;
+      }
       try {
+        if (a === "sampling") {
+          busy = true;
+          sampling = null;
+          render();
+          if (typeof Worker === "undefined")
+            sampling = checkSampling(p, config.detectorId);
+          else {
+            const w = new TaskWorker(
+              new URL("./simulation-worker.js", import.meta.url),
+              { type: "module" },
+            );
+            try {
+              sampling = await new Promise((resolve, reject) => {
+                w.onmessage = ({ data }) =>
+                  data.error ? reject(Error(data.error)) : resolve(data.result);
+                w.onerror = () => reject(Error("Sampling check failed."));
+                w.postMessage({
+                  operation: "sampling",
+                  project: p,
+                  detectorId: config.detectorId,
+                });
+              });
+            } finally {
+              w.terminate();
+            }
+          }
+          message = "Sampling check complete.";
+          return;
+        }
         if (a === "alignment") {
           onAlignment?.(
             structuredClone(workingProject || getProject()),
@@ -163,7 +209,7 @@ export function createSimulationWorkspace({
           if (typeof Worker === "undefined")
             comparison = compareStudies(left, right);
           else {
-            const w = new Worker(
+            const w = new TaskWorker(
               new URL("./simulation-worker.js", import.meta.url),
               { type: "module" },
             );
@@ -209,11 +255,9 @@ export function createSimulationWorkspace({
           );
           return;
         }
-        if (a === "open-file") {
-          root.querySelector("#simulation-file").click();
-          return;
-        }
+
         if (a === "current") {
+          sampling = null;
           workingProject = structuredClone(getProject());
           study = null;
           verification = null;
@@ -273,7 +317,7 @@ export function createSimulationWorkspace({
           if (typeof Worker === "undefined")
             study = simulateRuns(project, config);
           else {
-            const w = new Worker(
+            const w = new TaskWorker(
               new URL("./simulation-worker.js", import.meta.url),
               { type: "module" },
             );
@@ -314,12 +358,16 @@ export function createSimulationWorkspace({
     if (root) render();
   }
   async function restoreFile(input) {
+    sampling = null;
     let restored;
     if (typeof Worker === "undefined") restored = reopenSimulationStudy(input);
     else {
-      const w = new Worker(new URL("./simulation-worker.js", import.meta.url), {
-        type: "module",
-      });
+      const w = new TaskWorker(
+        new URL("./simulation-worker.js", import.meta.url),
+        {
+          type: "module",
+        },
+      );
       try {
         restored = await new Promise((resolve, reject) => {
           w.onmessage = ({ data }) =>
@@ -404,7 +452,7 @@ export function createSimulationWorkspace({
         root.id = "simulation-workspace";
         document.body.appendChild(root);
       }
-      root.hidden = false;
+      showWorkspace(root);
       document.querySelector("#app").inert = true;
       render();
       refresh();

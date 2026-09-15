@@ -93,3 +93,69 @@ export async function importProjectRecords(records) {
     }
   });
 }
+
+export async function changeStoredRecord(action, record) {
+  const db = await database();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(["runs", "archives"], "readwrite"),
+      archives = tx.objectStore("archives");
+    let reason;
+    tx.oncomplete = () => {
+      db.close();
+      resolve();
+    };
+    tx.onabort = tx.onerror = () => {
+      db.close();
+      reject(reason || Error("Storage change failed. Nothing was changed."));
+    };
+    if (action === "trash") {
+      const target = tx.objectStore(
+          record.format === "optibench-measurement" ? "runs" : "archives",
+        ),
+        req = target.get(record.id);
+      req.onsuccess = () => {
+        if (!req.result) {
+          reason = Error("Record no longer exists. Refresh storage.");
+          tx.abort();
+          return;
+        }
+        archives.add({
+          format: "optibench-trash",
+          version: 1,
+          id: crypto.randomUUID(),
+          createdAt: new Date().toISOString(),
+          record: req.result,
+        });
+        target.delete(record.id);
+      };
+    } else if (action === "restore") {
+      const req = archives.get(record.id);
+      req.onsuccess = () => {
+        const saved = req.result;
+        if (saved?.format !== "optibench-trash") {
+          reason = Error("Trash entry missing.");
+          tx.abort();
+          return;
+        }
+        const target = tx.objectStore(
+          saved.record.format === "optibench-measurement" ? "runs" : "archives",
+        );
+        target.add(saved.record);
+        archives.delete(saved.id);
+      };
+    } else if (action === "purge") {
+      const req = archives.get(record.id);
+      req.onsuccess = () => {
+        if (req.result?.format !== "optibench-trash") {
+          reason = Error("Only trash entries can be permanently removed.");
+          tx.abort();
+          return;
+        }
+        archives.delete(record.id);
+      };
+    } else {
+      reason = Error("Unknown storage operation.");
+      tx.abort();
+    }
+  });
+}

@@ -1,3 +1,4 @@
+import { TaskWorker } from "./task-worker.js";
 import {
   createArchive,
   recomputeArchive,
@@ -48,9 +49,12 @@ export function createArchivePanel({
       let computed;
       if (typeof Worker === "undefined") computed = recomputeArchive(a);
       else {
-        const w = new Worker(new URL("./archive-worker.js", import.meta.url), {
-          type: "module",
-        });
+        const w = new TaskWorker(
+          new URL("./archive-worker.js", import.meta.url),
+          {
+            type: "module",
+          },
+        );
         try {
           computed = await new Promise((resolve, reject) => {
             w.onmessage = ({ data }) =>

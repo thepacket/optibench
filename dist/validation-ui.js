@@ -1,3 +1,5 @@
+import { showWorkspace, closeWorkspace } from "./workspace-state.js";
+import { TaskWorker } from "./task-worker.js";
 import {
   benchmarks,
   runBenchmark,
@@ -86,7 +88,7 @@ export function createValidationCenter() {
             let r;
             if (typeof Worker === "undefined") r = runBenchmark(id);
             else {
-              const w = new Worker(
+              const w = new TaskWorker(
                 new URL("./validation-worker.js", import.meta.url),
                 { type: "module" },
               );
@@ -163,7 +165,7 @@ export function createValidationCenter() {
         document.body.appendChild(root);
         render();
       }
-      root.hidden = false;
+      showWorkspace(root);
     },
   };
 }

@@ -1,3 +1,5 @@
+import { showWorkspace, closeWorkspace } from "./workspace-state.js";
+import { TaskWorker } from "./task-worker.js";
 import {
   runAlignmentStudy,
   validateAlignmentConfig,
@@ -39,7 +41,7 @@ export function createAlignmentStudyWorkspace({
     const mirrors = base.items.filter(
       (x) => x.type === "mirror" && !x.locked && x.enabled !== false,
     );
-    root.innerHTML = `<header class="measurement-header"><button data-action="close">← Simulation</button><h1>Alignment & tolerance study</h1><button data-action="run" ${busy ? "disabled" : ""}>Find alignment & test tolerances</button>${busy ? '<button data-action="cancel">Cancel</button>' : ""}</header><main class="validation-main"><p>Frozen bench: <b>${esc(base.title)}</b>. Three-pass coordinate search, followed by seeded uniform perturbations around the proposed alignment. All results are synthetic.</p><fieldset ${busy ? "disabled" : ""}><div class="measurement-two"><label>Objective<select data-field="target"><option value="visibility" ${config.target === "visibility" ? "selected" : ""}>Maximize mean visibility</option><option value="validFraction" ${config.target === "validFraction" ? "selected" : ""}>Maximize valid detector fraction</option></select></label>${[
+    root.innerHTML = `<header class="measurement-header"><button data-action="close">← Optical bench</button><h1>Alignment & tolerance study</h1><button data-action="run" ${busy ? "disabled" : ""}>Find alignment & test tolerances</button>${busy ? '<button data-action="cancel">Cancel</button>' : ""}</header><main class="validation-main"><p>Frozen bench: <b>${esc(base.title)}</b>. Three-pass coordinate search, followed by seeded uniform perturbations around the proposed alignment. All results are synthetic.</p><fieldset ${busy ? "disabled" : ""}><div class="measurement-two"><label>Objective<select data-field="target"><option value="visibility" ${config.target === "visibility" ? "selected" : ""}>Maximize mean visibility</option><option value="validFraction" ${config.target === "validFraction" ? "selected" : ""}>Maximize valid detector fraction</option></select></label>${[
       ["minVisibility", "Minimum visibility"],
       ["minValid", "Minimum valid fraction"],
       ["trials", "Trials (5–100)"],
@@ -144,7 +146,7 @@ export function createAlignmentStudyWorkspace({
           if (!b) return;
           const a = b.dataset.action;
           if (a === "cancel") {
-            worker?.terminate();
+            worker?.cancel();
             worker = null;
             busy = false;
             message = "Cancelled; no bench changes applied.";
@@ -154,7 +156,7 @@ export function createAlignmentStudyWorkspace({
           if (busy) return;
           try {
             if (a === "close") {
-              root.hidden = true;
+              closeWorkspace(root);
               return;
             }
             if (a === "add") {
@@ -205,7 +207,7 @@ export function createAlignmentStudyWorkspace({
               if (typeof Worker === "undefined")
                 result = runAlignmentStudy(base, config);
               else {
-                worker = new Worker(
+                worker = new TaskWorker(
                   new URL("./alignment-study-worker.js", import.meta.url),
                   { type: "module" },
                 );
@@ -233,7 +235,7 @@ export function createAlignmentStudyWorkspace({
           }
         };
       }
-      root.hidden = false;
+      showWorkspace(root);
       render();
       try {
         entries = (await store.list()).filter(

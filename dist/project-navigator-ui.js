@@ -1,3 +1,5 @@
+import { createStoragePanel } from "./storage-panel.js";
+import { showWorkspace, closeWorkspace } from "./workspace-state.js";
 import { archiveStore, runStore, importProjectRecords } from "./run-store.js";
 import {
   kinds,
@@ -40,6 +42,7 @@ export function createProjectNavigator({
   runs = runStore,
   importRecords = importProjectRecords,
 }) {
+  const storagePanel = createStoragePanel();
   let root,
     records = [],
     bundles = [],
@@ -87,7 +90,7 @@ export function createProjectNavigator({
   function render() {
     const visible = view(),
       map = recordIndex(available());
-    root.innerHTML = `<header class="measurement-header"><button data-nav="close" ${busy ? "disabled" : ""}>← Optical bench</button><h1>Projects & experiments</h1><button data-nav="refresh" ${busy ? "disabled" : ""}>Refresh</button><button data-nav="import" ${busy ? "disabled" : ""}>Import project backup</button></header><div class="navigator-layout"><aside><h2>Project revisions</h2><button data-nav="all">All local records</button><button data-nav="new">New project</button>${projectTree()}<p>Records are stored in this browser. Export project backups for portability.</p></aside><main><div class="measurement-two"><label>Project name<input data-meta="title" maxlength="120" value="${esc(title)}"></label><label>Purpose / notes<textarea data-meta="notes" maxlength="10000">${esc(notes)}</textarea></label></div><p>${parent ? "Editing selection from saved project revision " + esc(parent.createdAt) + ". Saving creates a new revision." : "Select records for a new project revision."}</p><div class="measurement-buttons"><button data-nav="layout" ${busy ? "disabled" : ""}>Save current bench layout</button><button data-nav="select">Select visible records</button><button data-nav="clear">Clear selection</button><button data-nav="save" ${busy ? "disabled" : ""}>Save project revision (${selected.size})</button><button data-nav="export" ${parent && !busy ? "" : "disabled"}>Export saved project backup</button></div><label>Search records<input data-query value="${esc(query)}" placeholder="Name, component, date, ID or notes"></label><p role="status">${esc(message)}</p>${parent?.missingReferences?.length ? `<p>Missing referenced records: ${parent.missingReferences.map(esc).join(", ")}. The backup preserves those IDs but cannot include unavailable records.</p>` : ""}${Object.entries(
+    root.innerHTML = `<header class="measurement-header"><button data-nav="close" ${busy ? "disabled" : ""}>← Optical bench</button><h1>Projects & experiments</h1><button data-nav="refresh" ${busy ? "disabled" : ""}>Refresh</button><button data-nav="import" ${busy ? "disabled" : ""}>Import project backup</button></header><section id="navigator-storage"></section><div class="navigator-layout"><aside><h2>Project revisions</h2><button data-nav="all">All local records</button><button data-nav="new">New project</button>${projectTree()}<p>Records are stored in this browser. Export project backups for portability.</p></aside><main><div class="measurement-two"><label>Project name<input data-meta="title" maxlength="120" value="${esc(title)}"></label><label>Purpose / notes<textarea data-meta="notes" maxlength="10000">${esc(notes)}</textarea></label></div><p>${parent ? "Editing selection from saved project revision " + esc(parent.createdAt) + ". Saving creates a new revision." : "Select records for a new project revision."}</p><div class="measurement-buttons"><button data-nav="layout" ${busy ? "disabled" : ""}>Save current bench layout</button><button data-nav="select">Select visible records</button><button data-nav="clear">Clear selection</button><button data-nav="save" ${busy ? "disabled" : ""}>Save project revision (${selected.size})</button><button data-nav="export" ${parent && !busy ? "" : "disabled"}>Export saved project backup</button></div><label>Search records<input data-query value="${esc(query)}" placeholder="Name, component, date, ID or notes"></label><p role="status">${esc(message)}</p>${parent?.missingReferences?.length ? `<p>Missing referenced records: ${parent.missingReferences.map(esc).join(", ")}. The backup preserves those IDs but cannot include unavailable records.</p>` : ""}${Object.entries(
       kinds,
     )
       .map(([format, label]) => {
@@ -112,11 +115,16 @@ export function createProjectNavigator({
       .join(
         "",
       )}${report ? `<section><h2>Recomputed comparison</h2>${comparisonHTML(report)}</section>` : ""}</main></div><input type="file" accept=".json" hidden data-import>`;
+    storagePanel.mount(root.querySelector("#navigator-storage"));
   }
   async function action(e) {
     const b = e.target.closest("[data-nav]");
     if (!b || busy) return;
     const a = b.dataset.nav;
+    if (a === "import") {
+      root.querySelector("[data-import]").click();
+      return;
+    }
     try {
       if (a === "close") {
         root.hidden = true;
@@ -155,6 +163,7 @@ export function createProjectNavigator({
       if (a === "select") view().forEach((r) => selected.add(r.id));
       if (a === "clear") selected.clear();
       if (a === "layout") {
+        busy = true;
         const r = createLayout(getProject(), getProject().title, notes);
         await archives.save(r);
         await refresh();
@@ -178,10 +187,7 @@ export function createProjectNavigator({
       if (a === "export" && parent) download(parent);
       if (a === "record-export")
         download(available().find((r) => r.id === b.dataset.id));
-      if (a === "import") {
-        root.querySelector("[data-import]").click();
-        return;
-      }
+
       if (a === "source") {
         const r = available().find((r) => r.id === b.dataset.id);
         await onOpen(createLayout(sourceBench(r)), available());
@@ -266,7 +272,7 @@ export function createProjectNavigator({
           }
         };
       }
-      root.hidden = false;
+      showWorkspace(root);
       document.querySelector("#app").inert = true;
       busy = true;
       render();

@@ -188,3 +188,11 @@ Tests exercise a known analytic objective with an optimum at +0.01 degrees, veri
 ## Project navigation and backups
 
 Tests verify transitive parent inclusion, immutable project snapshots and revision links, full source-frame retention, unique sweep provenance resolution, missing-parent reporting, idempotent import planning, conflict/duplicate rejection, and component/date/notes search. An emulated navigator test selects records, saves a project revision and dispatches restoration. Imports validate record inputs before a single cross-store IndexedDB transaction; reconstruction remains an explicit action in the corresponding analysis workspace. No physical validation is inferred from successful backup or restore.
+
+## Browser reliability audit (2026-09-15)
+
+Using the actual in-app browser on localhost, exercised Michelson setup loading, worker sweep execution, named revision saving and replay, comparison of two saved revisions, comparison persistence, three-grid sampling checks, alignment cancellation/retry, proposal application and Undo, project selection/saving, backup export action, fixture import and conflicting-identity rejection, and capture/reconstruction/saving of measurement frames. The navigator was also inspected visually at the available narrow viewport. Live-site experiment storage was not used for these tests.
+
+The audit found and fixed detached file inputs in project/sweep imports, lingering completed-job progress, and overlapping workspace transitions. Keyboard entry was used for form tests because the browser automation's fill operation did not consistently dispatch the app's change handlers. The downloaded project file itself was not independently inspected; import was verified with a generated schema-valid fixture. No destructive browser purge was performed.
+
+Automated regression tests verify transaction rollback across IndexedDB stores, exact Trash restoration, purge restrictions, three-grid numerical output, cancellation and terminal-response cleanup, workspace isolation and file-input identity retention. These complement the existing numerical and emulated interaction suite; they are not full browser coverage across every platform or all experimental configurations.

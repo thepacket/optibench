@@ -100,6 +100,10 @@ test("navigator saves project selections, displays source benches, and dispatche
     importRecords: async (rows) => data.push(...rows),
   });
   await nav.open();
+  const picker = document.querySelector("[data-import]");
+  document.querySelector('[data-nav="import"]').click();
+  await new Promise((r) => setTimeout(r, 0));
+  assert.equal(document.querySelector("[data-import]"), picker);
   assert.match(
     document.querySelector("#project-navigator").textContent,
     /Recorded source bench/,

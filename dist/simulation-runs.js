@@ -4,7 +4,7 @@ import { analyzeMeasurement, defaultMeasurementSettings } from "./metrology.js";
 import { seededRandom, normalRandom } from "./optics.js";
 import { serializable } from "./run-store.js";
 export const SIMULATION_VERSION = "1.0.0";
-export function simulateRuns(project, config) {
+export function simulateRuns(project, config, options = {}) {
   const base = validateProject(project),
     { parameter, detectorId, mirrorId, start, end, count, seed } = config;
   if (
@@ -37,8 +37,9 @@ export function simulateRuns(project, config) {
     !base.items.some((c) => c.id === mirrorId && c.type === "mirror")
   )
     throw Error("Choose an arm mirror.");
-  const n = 128,
-    reference = coherentField(base, detectorId, { n });
+  const n = options.n ?? 128;
+  if (![64, 128, 256].includes(n)) throw Error("Unsupported sampling grid.");
+  const reference = coherentField(base, detectorId, { n });
   if (reference.paths.length !== 2)
     throw Error("Select a detector with two coherent paths.");
   let scale = 0;
@@ -57,6 +58,7 @@ export function simulateRuns(project, config) {
     createdAt = new Date().toISOString(),
     rows = [];
   for (let k = 0; k < count; k++) {
+    options.onProgress?.(`Point ${k + 1} of ${count}`);
     const value = start + ((end - start) * k) / (count - 1),
       p = structuredClone(base),
       mirror = p.items.find((c) => c.id === mirrorId);
