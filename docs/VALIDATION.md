@@ -1,4 +1,4 @@
-# Model validation — OptiBench 0.4.0
+# Model validation — OptiBench 0.5.0
 
 ## Units and conventions
 
@@ -119,3 +119,18 @@ Numerical regressions recover a known multi-wrap four-step wavefront to 10⁻⁸
 Emulated application tests cover image decoding/import order, reconstruction, calibration edits invalidating results, immutable saved runs, run restoration/comparison, simulated bench capture, keyboard isolation and CSV/JSON/report contents. They do not replace physical instrument validation or browser rendering tests. IndexedDB uses the browser transaction API and surfaces storage failures rather than claiming a save succeeded.
 
 References: [Takeda, Ina and Kobayashi, Fourier-transform method of fringe-pattern analysis (1982)](https://opg.optica.org/josa/abstract.cfm?uri=josa-72-1-156); [GRAVITY metrology: four-step phase-shifting concept and calibration (2015)](https://arxiv.org/abs/1501.04738).
+
+
+## Optomechanics and alignment (0.5.0)
+
+Each component has an axis height Z; sources, mirrors and splitters also accept elevation/pitch within ±1°. Existing projects without Z inherit the table reference height on validation. Plan-view intersections remain two-dimensional. The elevation extension propagates z += L·slope; source slope is tan(pitch). A plane mirror changes the vertical slope by −2(d_xy·n_xy)·pitch in radians, which is the first-order vertical component of vector reflection. A thin lens adds −vertical_decenter/f. Splitter transmission retains the slope and reflection applies the mirror update. The horizontal path length remains the Gaussian propagation distance, so this is not a full three-dimensional wave solution.
+
+A centroid outside an optic's combined transverse/vertical circular envelope is recorded as a missed optic and continues along the incident direction. A centroid outside an iris/lens clear aperture stops. A descending ray stops at Z=0. Gaussian power clipping remains a centered approximation; the Alignment edge-margin diagnostic separately subtracts the 1/e² beam radius. Gaussian detector previews account for the vertical centroid shift. Folded coherent and Fourier calculations explicitly reject noncoplanar/elevation-tilted configurations.
+
+The instrument tray projects all current branches onto X–Z or Y–Z, including posts, holder extensions and stage bases. Multiple optics may overlap in either projection; switch axes or use the simultaneous top view. Target cards expose horizontal/vertical centroid offsets and a 0.05 mm centring tolerance. Camera target clearance uses an inscribed circle of the active sensor. Dual-iris slope is reported only for the first two parallel irises on one unambiguous branch with no intervening optic, using changes in offset divided by path separation. This is a relative alignment diagnostic, not an uncertainty bound.
+
+Mount assemblies are parametric assumptions, not catalog-verified products: post plus adjustable holder; a kinematic mirror mount with 6–50.8 mm optic capacity; and an XYZ stage with a 15 mm base. Holder extension is modeled from 0–50 mm. Stages retain X/Y/Z zero references and a configurable symmetric travel. Fine controls reject out-of-travel moves and locked-component moves; direct edits may create an invalid design state that is flagged in Design checks. Relocating the stage base resets its references. Thread checks refer to the base/table interface only. Footprints and clearances remain approximate; no screws, stress, stiffness, vibration or tolerance stack certification is modeled.
+
+Tests check source elevation rise, projected mirror double-angle response, splitter-branch elevation, lens vertical focusing, missed mirrors, blocked irises, exact table interception, dual-iris pointing/centring, stage limits, thread/holder diagnostics, project round trips and explicit wave-solver limits. Application tests cover synchronized side projections, stage nudges, selection, undo, persistent height changes and diagnostics.
+
+Alignment reference: [Newport two-mirror alignment application note](https://www.newport.com/medias/sys_master/images/images/h4b/h31/8797093363742/Fast-Steering-Mirror-Technology-App-Note-2.pdf).

@@ -13,6 +13,12 @@ npm start
 
 Open the local server at `http://localhost:5173`. Runtime code has no npm dependencies. `happy-dom` and `prettier` are development tools only. Hosted output is the authored `dist/` directory; `.openai/hosting.json` preserves the existing private Sites project.
 
+## Alignment workflow
+
+Open **Setups → Two-mirror alignment**. The Alignment instrument tray shows an X–Z/Y–Z side projection, iris centroid targets and fine yaw/elevation/height adjustments. Select an optic to set its axis height and attach a parametric post/holder, kinematic mount or XYZ stage. Stage travel, holder extension, thread mismatch and optic/table clearance generate design checks. Mount coordinates and stage offsets export as CSV; the complete project preserves all mechanical settings.
+
+Vertical ray propagation is a first-order extension of the plan-view trace, limited to small elevation angles. The coherent/Fourier solvers continue to require coplanar optics. See the validation document for these boundaries.
+
 ## Measurement workflow
 
 Choose **Measure** in the app rail. Import a single spatial-carrier image or four frames ordered 0°, 90°, 180°, 270°. The workbench accepts opaque PNG/JPEG/WebP decoded to 8-bit luminance at native resolution, with optional dark and flat frames. Set a square ROI, sample-plane pixel calibration, wavelength and OPD/reflection geometry; reconstruct phase, inspect masks and diagnostics, then save a named experiment.

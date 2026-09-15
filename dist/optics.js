@@ -88,6 +88,8 @@ export function trace(project, { rays = false } = {}) {
         source: src,
         depth: 0,
         path: [],
+        z: src.z ?? project.table.heightAbove ?? 100,
+        slope: Math.tan((src.pitch || 0) * DEG),
         s: 0,
         phase: 0,
         piston: 0,
@@ -120,6 +122,15 @@ export function trace(project, { rays = false } = {}) {
         next = null;
         c = null;
       }
+      if (beam.slope < 0 && beam.z + beam.slope * len < 0) {
+        len = -beam.z / beam.slope;
+        next = null;
+        c = null;
+        warnings.push({
+          level: "error",
+          text: "A beam reaches the table surface; path stopped.",
+        });
+      }
       const end = {
         x: beam.p.x + beam.d.x * len,
         y: beam.p.y + beam.d.y * len,
@@ -127,6 +138,8 @@ export function trace(project, { rays = false } = {}) {
       const q2 = propagateQ(beam.q, len);
       segments.push({
         from: { ...beam.p },
+        z0: beam.z,
+        z1: beam.z + beam.slope * len,
         to: end,
         q: { ...beam.q },
         qEnd: q2,
@@ -142,6 +155,7 @@ export function trace(project, { rays = false } = {}) {
         ray: rays,
       });
       beam.phase -= Math.atan2(q2.re, q2.im) - Math.atan2(beam.q.re, beam.q.im);
+      beam.z += beam.slope * len;
       beam.s += len;
       beam.q = q2;
       if (!next) break;
@@ -150,6 +164,9 @@ export function trace(project, { rays = false } = {}) {
         id: c.id,
         source: beam.source.id,
         position: end,
+        z: beam.z,
+        verticalOffset: beam.z - (c.z ?? project.table.heightAbove ?? 100),
+        slope: beam.slope,
         distance: beam.s,
         opticalPath: beam.s + beam.piston,
         phase: beam.phase,
@@ -176,6 +193,40 @@ export function trace(project, { rays = false } = {}) {
       };
       hits.push(encounter);
       beam.path = encounter.path;
+      const vertical = encounter.verticalOffset;
+      if (
+        Math.hypot(next.offset, vertical) > c.diameter / 2 &&
+        Math.abs(vertical) > 1e-8
+      ) {
+        encounter.missed = true;
+        warnings.push({
+          id: c.id,
+          level: "error",
+          text: `${c.label}: beam centroid misses the optic vertically (${vertical.toFixed(3)} mm offset).`,
+        });
+        beam.p = end;
+        beam.last = c.id;
+        continue;
+      }
+      if (
+        ["aperture", "lens"].includes(c.type) &&
+        Math.hypot(next.offset, vertical) > (c.aperture || c.diameter) / 2
+      ) {
+        encounter.blocked = true;
+        warnings.push({
+          id: c.id,
+          level: "error",
+          text: `${c.label}: beam centroid is outside the clear aperture.`,
+        });
+        break;
+      }
+      if (Math.abs(vertical) > w * 0.1)
+        warnings.push({
+          id: c.id,
+          level: "warning",
+          text: `${c.label}: vertical decenter ${vertical.toFixed(3)} mm; inspect Alignment for centroid clearance.`,
+        });
+
       if (
         c.range &&
         (beam.source.wavelength < c.range[0] ||
@@ -218,6 +269,7 @@ export function trace(project, { rays = false } = {}) {
               text: `${c.label}: finite aperture clips the beam; downstream Gaussian shape is approximate.`,
             });
         }
+        beam.slope -= vertical / c.f;
         beam.q = lensQ(beam.q, c.f);
         const axis =
           dot(beam.d, next.n) > 0 ? next.n : { x: -next.n.x, y: -next.n.y };
@@ -259,6 +311,7 @@ export function trace(project, { rays = false } = {}) {
         beam.phase += Math.PI;
         beam.piston +=
           2 * (c.pistonNm || 0) * 1e-6 * Math.abs(dot(beam.d, next.n));
+        beam.slope -= 2 * dot(beam.d, next.n) * (c.pitch || 0) * DEG;
         beam.d = reflection(beam.d, next.n);
         beam.power *= c.reflectivity;
       }
@@ -268,6 +321,7 @@ export function trace(project, { rays = false } = {}) {
             ...beam,
             p: { ...end },
             d: reflection(beam.d, next.n),
+            slope: beam.slope - 2 * dot(beam.d, next.n) * (c.pitch || 0) * DEG,
             power: beam.power * c.reflectivity,
             phase: beam.phase + Math.PI / 2,
             last: c.id,

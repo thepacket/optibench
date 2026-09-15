@@ -1,3 +1,10 @@
+import {
+  mountModels,
+  mechanicalChecks,
+  alignmentTargets,
+  pairAlignment,
+  stageMove,
+} from "./alignment.js";
 import { createMetrologyWorkspace } from "./metrology-ui.js";
 import { catalog, categories, sources, instantiate } from "./catalog.js";
 import {
@@ -36,7 +43,7 @@ const $ = (s) => document.querySelector(s),
 const fmt = (v, d = 2) => (Number.isFinite(v) ? v.toFixed(d) : "—");
 const pct = (v) => fmt(v * 100, 1) + "%";
 const storeKey = "optibench-lab-v2";
-let project = makeProject(),
+let project = validateProject(makeProject()),
   restoreMessage = "";
 try {
   const saved = localStorage.getItem(storeKey);
@@ -49,6 +56,9 @@ try {
     "The saved draft could not be restored. Your project file can still be opened.";
 }
 let activeBranch = null;
+let sideAxis = "x",
+  alignmentAngleStep = 0.01,
+  alignmentPositionStep = 0.1;
 let fringeCache = null,
   fringeScan = null;
 let selected = new Set([project.items[1]?.id].filter(Boolean)),
@@ -60,7 +70,7 @@ let selected = new Set([project.items[1]?.id].filter(Boolean)),
   brand = "All manufacturers",
   scope = "All entries",
   sort = "recommended",
-  resultTab = "detector",
+  resultTab = project.solver === "Alignment" ? "alignment" : "detector",
   drawer = "",
   activeDetector = null,
   result,
@@ -197,9 +207,10 @@ function mount() {
       .map(([a, i, t]) => button(a, t, i, a === "bench" ? "active" : ""))
       .join(
         "",
-      )}<div class="rail-spacer"></div>${button("table", "Table", "settings")}${button("guide", "Guide", "info")}</nav><aside class="library panel" id="library-panel"><div class="panel-title"><h2>Component inventory</h2>${iconButton("close-drawer", "Close inventory", "close", "drawer-close")}</div><div class="inventory-summary"><strong>${catalog.length}</strong> entries <span>·</span> <strong>${catalog.filter((c) => c.provenance !== "ideal").length}</strong> manufacturer references</div><label class="searchbox">${icon("search")}<input id="search" aria-label="Search inventory" placeholder="Part number or component…" value="${esc(query)}"><kbd>⌘K</kbd></label><div class="library-filters"><select id="category" aria-label="Component category">${categories.map((c) => `<option ${category === c ? "selected" : ""}>${c}</option>`).join("")}</select><select id="brand" aria-label="Manufacturer">${["All manufacturers", "Thorlabs", "Edmund Optics", "Newport", "OptiBench", "Custom"].map((c) => `<option ${brand === c ? "selected" : ""}>${c}</option>`).join("")}</select><select id="scope" aria-label="Catalog provenance">${["All entries", "Manufacturer references", "Ideal designs"].map((c) => `<option ${scope === c ? "selected" : ""}>${c}</option>`).join("")}</select></div><div class="inventory-sort"><span id="catalog-count"></span><select id="sort" aria-label="Sort inventory"><option value="recommended">Recommended</option><option value="focal">Focal length ↑</option><option value="diameter">Diameter ↑</option><option value="part">Part number</option></select></div><div id="catalog-list" class="catalog-list"></div><div class="library-footer">${button("custom", "Custom component", "plus")}${button("compare", "Compare (0)", "parts", "", 'id="compare-button"')}${button("import-catalog", "Import catalog JSON", "folder")}</div></aside><main class="workspace"><div class="workspace-heading"><div><p class="eyebrow">OPTICAL DESIGN WORKSPACE</p><h1 id="project-title">${esc(project.title)}</h1></div><div class="workspace-actions">${iconButton("undo", "Undo · Ctrl/Cmd Z", "undo")}${iconButton("redo", "Redo · Ctrl/Cmd Shift Z", "redo")}<span class="separator"></span>${button("run", "Pause", "pause", "accent", 'id="run-button"')}</div></div><div class="workbar"><div class="tools" role="group" aria-label="Table tools">${iconButton("tool-select", "Select & move · V", "cursor", "active")}${iconButton("tool-pan", "Pan table · H / middle-drag", "hand")}${iconButton("tool-measure", "Measure distance · M", "ruler")}<span class="separator"></span>${iconButton("fit", "Fit entire table · F", "fit")}${iconButton("grid", "Toggle mounting holes", "grid", "active")}</div><div class="mode-controls"><select id="mode" aria-label="Physics engine"><option>Gaussian</option><option>Rays</option><option>Fourier</option><option>Interferometry</option></select><span class="mode-indicator" id="mode-indicator">ABCD + 2D PATH</span></div>${button("inspect", "Inspector", "settings", "compact inspector-toggle")}</div><div class="bench-stage" id="stage"><svg id="bench" xmlns="http://www.w3.org/2000/svg" aria-label="Laboratory optical table" tabindex="0"></svg><div class="canvas-top"><span id="table-label"></span><span id="coordinate-readout">X — &nbsp; Y — mm</span></div><div class="canvas-bottom"><div class="view-options"><label><input type="checkbox" id="envelope" checked>Envelope</label><label><input type="checkbox" id="labels" checked>Labels</label><button data-action="table">Table settings</button></div><div class="zoom-control">${button("zoom-out", "−")}<span id="zoom-readout">100%</span>${button("zoom-in", "+")}${iconButton("fit", "Fit table", "fit")}</div></div><div id="placement-hint" class="placement-hint" hidden></div></div><section class="results-panel" id="results-panel"><div class="results-heading"><div class="result-tabs">${[
+      )}<div class="rail-spacer"></div>${button("table", "Table", "settings")}${button("guide", "Guide", "info")}</nav><aside class="library panel" id="library-panel"><div class="panel-title"><h2>Component inventory</h2>${iconButton("close-drawer", "Close inventory", "close", "drawer-close")}</div><div class="inventory-summary"><strong>${catalog.length}</strong> entries <span>·</span> <strong>${catalog.filter((c) => c.provenance !== "ideal").length}</strong> manufacturer references</div><label class="searchbox">${icon("search")}<input id="search" aria-label="Search inventory" placeholder="Part number or component…" value="${esc(query)}"><kbd>⌘K</kbd></label><div class="library-filters"><select id="category" aria-label="Component category">${categories.map((c) => `<option ${category === c ? "selected" : ""}>${c}</option>`).join("")}</select><select id="brand" aria-label="Manufacturer">${["All manufacturers", "Thorlabs", "Edmund Optics", "Newport", "OptiBench", "Custom"].map((c) => `<option ${brand === c ? "selected" : ""}>${c}</option>`).join("")}</select><select id="scope" aria-label="Catalog provenance">${["All entries", "Manufacturer references", "Ideal designs"].map((c) => `<option ${scope === c ? "selected" : ""}>${c}</option>`).join("")}</select></div><div class="inventory-sort"><span id="catalog-count"></span><select id="sort" aria-label="Sort inventory"><option value="recommended">Recommended</option><option value="focal">Focal length ↑</option><option value="diameter">Diameter ↑</option><option value="part">Part number</option></select></div><div id="catalog-list" class="catalog-list"></div><div class="library-footer">${button("custom", "Custom component", "plus")}${button("compare", "Compare (0)", "parts", "", 'id="compare-button"')}${button("import-catalog", "Import catalog JSON", "folder")}</div></aside><main class="workspace"><div class="workspace-heading"><div><p class="eyebrow">OPTICAL DESIGN WORKSPACE</p><h1 id="project-title">${esc(project.title)}</h1></div><div class="workspace-actions">${iconButton("undo", "Undo · Ctrl/Cmd Z", "undo")}${iconButton("redo", "Redo · Ctrl/Cmd Shift Z", "redo")}<span class="separator"></span>${button("run", "Pause", "pause", "accent", 'id="run-button"')}</div></div><div class="workbar"><div class="tools" role="group" aria-label="Table tools">${iconButton("tool-select", "Select & move · V", "cursor", "active")}${iconButton("tool-pan", "Pan table · H / middle-drag", "hand")}${iconButton("tool-measure", "Measure distance · M", "ruler")}<span class="separator"></span>${iconButton("fit", "Fit entire table · F", "fit")}${iconButton("grid", "Toggle mounting holes", "grid", "active")}</div><div class="mode-controls"><select id="mode" aria-label="Physics engine"><option>Gaussian</option><option>Rays</option><option>Fourier</option><option>Interferometry</option><option>Alignment</option></select><span class="mode-indicator" id="mode-indicator">ABCD + 2D PATH</span></div>${button("inspect", "Inspector", "settings", "compact inspector-toggle")}</div><div class="bench-stage" id="stage"><svg id="bench" xmlns="http://www.w3.org/2000/svg" aria-label="Laboratory optical table" tabindex="0"></svg><div class="canvas-top"><span id="table-label"></span><span id="coordinate-readout">X — &nbsp; Y — mm</span></div><div class="canvas-bottom"><div class="view-options"><label><input type="checkbox" id="envelope" checked>Envelope</label><label><input type="checkbox" id="labels" checked>Labels</label><button data-action="table">Table settings</button></div><div class="zoom-control">${button("zoom-out", "−")}<span id="zoom-readout">100%</span>${button("zoom-in", "+")}${iconButton("fit", "Fit table", "fit")}</div></div><div id="placement-hint" class="placement-hint" hidden></div></div><section class="results-panel" id="results-panel"><div class="results-heading"><div class="result-tabs">${[
       ["detector", "Detector"],
       ["envelope", "Propagation"],
+      ["alignment", "Alignment"],
       ["paths", "Optical path"],
       ["checks", "Design checks"],
     ]
@@ -247,7 +258,11 @@ function renderCatalog() {
   $("#compare-button span").textContent = `Compare (${compare.size})`;
 }
 function allChecks() {
-  return [...layoutChecks(project), ...(result?.warnings || [])];
+  return [
+    ...layoutChecks(project),
+    ...mechanicalChecks(project),
+    ...(result?.warnings || []),
+  ];
 }
 function renderPanels() {
   renderCatalog();
@@ -288,7 +303,9 @@ function renderStatus() {
         ? "2D PARAXIAL RAYS"
         : mode === "Interferometry"
           ? "COHERENT TWO-ARM"
-          : "ABCD + 2D PATH";
+          : mode === "Alignment"
+            ? "XY + PARAXIAL Z"
+            : "ABCD + 2D PATH";
   $("#check-count").textContent = warnings.length ? " " + warnings.length : "";
   $("#table-label").textContent =
     `${project.table.width} × ${project.table.height} mm · ${project.table.thread} / ${project.table.pitch} mm`;
@@ -544,8 +561,19 @@ function renderInspector() {
         }),
       )
       .join("");
+  const mechanics = `<div class="inspector-section"><h4>Height & optomechanics</h4>${inputField("Optic axis above table", "z", c.z ?? project.table.heightAbove, { unit: "mm", min: 1, max: 1000 })}${["source", "image", "mirror", "splitter"].includes(c.type) ? inputField(c.type === "source" || c.type === "image" ? "Source elevation" : "Mirror normal elevation", "pitch", c.pitch ?? 0, { unit: "°", min: -1, max: 1 }) : ""}<label class="field"><span>Parametric mounting assembly</span><select data-field="mountType">${Object.entries(
+    mountModels,
+  )
+    .map(
+      ([id, m]) =>
+        `<option value="${id}" ${(c.mountType || "none") === id ? "selected" : ""}>${m.name}</option>`,
+    )
+    .join(
+      "",
+    )}</select></label>${c.mountType && c.mountType !== "none" ? `${inputField("Post length", "postLength", c.postLength, { unit: "mm", min: 0, max: 1000 })}<label class="field"><span>Base thread</span><select data-field="mountThread">${[...new Set(["M6", "¼″–20", c.mountThread || project.table.thread])].map((t) => `<option ${c.mountThread === t ? "selected" : ""}>${t}</option>`).join("")}</select></label><p class="field-note">Holder extension ${fmt(c.z - c.postLength - mountModels[c.mountType].base, 2)} mm / 0–50 mm. ${c.mountType === "xyz" ? "Stage base: 15 mm." : ""}</p>` : ""}${c.mountType === "xyz" ? `${inputField("XYZ half travel", "stageTravel", c.stageTravel, { unit: "±mm", min: 0.01, max: 100 })}<p class="field-note">Stage zero: X ${fmt(c.stageOriginX, 2)}, Y ${fmt(c.stageOriginY, 2)}, Z ${fmt(c.stageOriginZ, 2)} mm. Offsets: ${fmt(c.x - c.stageOriginX, 3)}, ${fmt(c.y - c.stageOriginY, 3)}, ${fmt(c.z - c.stageOriginZ, 3)} mm.</p>${button("stage-rebase", "Relocate stage base to current position", "settings", "outline full")}` : ""}<p class="field-note">Ideal mechanical models. Holder travel, footprint and thread checks do not verify manufacturer-specific fit.</p>${button("show-alignment", "Open alignment instruments", "ruler", "outline full")}</div>`;
   const at = result?.hits.find((h) => h.id === c.id);
-  wrap.innerHTML = `<div class="inspector-summary"><div class="inspector-glyph ${c.type}">${icon(typeIcon(c.type), 35)}</div><span class="eyebrow">${esc(c.brand)} ${selected.size > 1 ? "· " + selected.size + " selected" : ""}</span><h3>${esc(c.name)}</h3><code>${esc(c.part)}</code><span class="provenance ${c.provenance === "ideal" ? "ideal" : ""}">${c.provenance === "ideal" ? "PARAMETRIC DESIGN" : "CATALOG REFERENCE"}</span></div><div class="inspector-section"><label class="field"><span>Component label</span><input data-field="label" maxlength="100" value="${esc(c.label)}"></label><div class="two-col">${inputField("X position", "x", c.x, { unit: "mm", min: 0, max: project.table.width })}${inputField("Y position", "y", c.y, { unit: "mm", min: 0, max: project.table.height })}</div>${inputField("Optical normal / source direction", "angle", c.angle, { unit: "°", min: -3600, max: 3600 })}<div class="inline-checks"><label><input data-field="enabled" type="checkbox" ${c.enabled ? "checked" : ""}>Enabled</label><label><input data-field="locked" type="checkbox" ${c.locked ? "checked" : ""}>Lock position</label></div><div class="inspector-buttons">${button("rotate", "Rotate 15°", "rotate")}${button("duplicate", "Duplicate", "copy")}</div></div>${optical ? `<div class="inspector-section"><h4>Optical parameters</h4>${optical}${c.assumptions ? `<p class="field-note">${esc(c.assumptions)}</p>` : ""}</div>` : ""}<div class="inspector-section"><h4>Mechanical envelope</h4>${inputField("Optic / active diameter", "diameter", c.diameter, { unit: "mm", min: 0.001, max: 500 })}${inputField("Mount footprint · estimate", "footprint", c.footprint, { unit: "mm", min: 1, max: 500 })}<p class="field-note">Footprint checks use an adjustable envelope. Mount drawings and beam height need mechanical verification.</p></div>${at ? `<div class="inspector-section"><h4>Incident field</h4><dl class="specs"><dt>Beam radius</dt><dd>${fmt(at.radius, 4)} mm</dd><dt>Power</dt><dd>${fmt(at.power, 6)} mW</dd><dt>Path length</dt><dd>${fmt(at.distance, 2)} mm</dd><dt>Decenter</dt><dd>${fmt(at.offset, 4)} mm</dd><dt>Incidence</dt><dd>${fmt(at.incidence, 2)}°</dd></dl></div>` : ""}<div class="inspector-section"><h4>Catalog & assumptions</h4>${overrides.length ? `<p class="override-note">Model overrides: ${overrides.join(", ")}.</p>` : ""}<dl class="specs"><dt>Diameter</dt><dd>${reference?.diameter ?? c.diameter} mm</dd>${reference?.f ? `<dt>Nominal EFL</dt><dd>${reference.f} mm</dd>` : ""}${c.bfl ? `<dt>Catalog BFL</dt><dd>${c.bfl} mm</dd>` : ""}${c.coating ? `<dt>Coating</dt><dd>${esc(c.coating)}</dd>` : ""}${c.glass ? `<dt>Material</dt><dd>${esc(c.glass)}</dd>` : ""}${c.thread ? `<dt>Thread</dt><dd>${esc(c.thread)}</dd>` : ""}</dl><p class="field-note">${esc(src.status)}. Lens simulation uses ideal principal planes; catalog BFL does not shift the modeled plane.</p>${src.url ? `<a class="source-link" target="_blank" rel="noopener" href="${esc(src.url)}">Manufacturer source ${icon("external", 14)}</a>` : ""}${button("replace", "Find equivalent lenses", "search", "outline full")}${button("reset-component", "Reset optical parameters", "undo", "full")}</div><div class="inspector-section"><label class="field"><span>Component notes</span><textarea data-field="notes" maxlength="2000" rows="3">${esc(c.notes)}</textarea></label>${button("remove", "Remove selected", "trash", "danger full")}</div>`;
+  wrap.innerHTML = `<div class="inspector-summary"><div class="inspector-glyph ${c.type}">${icon(typeIcon(c.type), 35)}</div><span class="eyebrow">${esc(c.brand)} ${selected.size > 1 ? "· " + selected.size + " selected" : ""}</span><h3>${esc(c.name)}</h3><code>${esc(c.part)}</code><span class="provenance ${c.provenance === "ideal" ? "ideal" : ""}">${c.provenance === "ideal" ? "PARAMETRIC DESIGN" : "CATALOG REFERENCE"}</span></div><div class="inspector-section"><label class="field"><span>Component label</span><input data-field="label" maxlength="100" value="${esc(c.label)}"></label><div class="two-col">${inputField("X position", "x", c.x, { unit: "mm", min: 0, max: project.table.width })}${inputField("Y position", "y", c.y, { unit: "mm", min: 0, max: project.table.height })}</div>${inputField("Optical normal / source direction", "angle", c.angle, { unit: "°", min: -3600, max: 3600 })}<div class="inline-checks"><label><input data-field="enabled" type="checkbox" ${c.enabled ? "checked" : ""}>Enabled</label><label><input data-field="locked" type="checkbox" ${c.locked ? "checked" : ""}>Lock position</label></div><div class="inspector-buttons">${button("rotate", "Rotate 15°", "rotate")}${button("duplicate", "Duplicate", "copy")}</div></div>${optical ? `<div class="inspector-section"><h4>Optical parameters</h4>${optical}${c.assumptions ? `<p class="field-note">${esc(c.assumptions)}</p>` : ""}</div>` : ""}<div class="inspector-section"><h4>Mechanical envelope</h4>${inputField("Optic / active diameter", "diameter", c.diameter, { unit: "mm", min: 0.001, max: 500 })}${inputField("Mount footprint · estimate", "footprint", c.footprint, { unit: "mm", min: 1, max: 500 })}<p class="field-note">Footprint checks use an adjustable envelope. Use Height & optomechanics for posts, stages and vertical alignment.</p></div>${mechanics}${at ? `<div class="inspector-section"><h4>Incident field</h4><dl class="specs"><dt>Beam radius</dt><dd>${fmt(at.radius, 4)} mm</dd><dt>Power</dt><dd>${fmt(at.power, 6)} mW</dd><dt>Path length</dt><dd>${fmt(at.distance, 2)} mm</dd><dt>Decenter</dt><dd>${fmt(at.offset, 4)} mm</dd><dt>Incidence</dt><dd>${fmt(at.incidence, 2)}°</dd></dl></div>` : ""}<div class="inspector-section"><h4>Catalog & assumptions</h4>${overrides.length ? `<p class="override-note">Model overrides: ${overrides.join(", ")}.</p>` : ""}<dl class="specs"><dt>Diameter</dt><dd>${reference?.diameter ?? c.diameter} mm</dd>${reference?.f ? `<dt>Nominal EFL</dt><dd>${reference.f} mm</dd>` : ""}${c.bfl ? `<dt>Catalog BFL</dt><dd>${c.bfl} mm</dd>` : ""}${c.coating ? `<dt>Coating</dt><dd>${esc(c.coating)}</dd>` : ""}${c.glass ? `<dt>Material</dt><dd>${esc(c.glass)}</dd>` : ""}${c.thread ? `<dt>Thread</dt><dd>${esc(c.thread)}</dd>` : ""}</dl><p class="field-note">${esc(src.status)}. Lens simulation uses ideal principal planes; catalog BFL does not shift the modeled plane.</p>${src.url ? `<a class="source-link" target="_blank" rel="noopener" href="${esc(src.url)}">Manufacturer source ${icon("external", 14)}</a>` : ""}${button("replace", "Find equivalent lenses", "search", "outline full")}${button("reset-component", "Reset optical parameters", "undo", "full")}</div><div class="inspector-section"><label class="field"><span>Component notes</span><textarea data-field="notes" maxlength="2000" rows="3">${esc(c.notes)}</textarea></label>${button("remove", "Remove selected", "trash", "danger full")}</div>`;
+  wrap.querySelector('[data-field="mountType"]').value = c.mountType || "none";
 }
 function detectorHit() {
   const list = result?.detectors.filter((d) => d.id === activeDetector) || [];
@@ -558,7 +586,7 @@ function gaussianImage(hit, n = 128, width = 6) {
     for (let y = 0; y < n; y++)
       for (let x = 0; x < n; x++) {
         const xx = (x + 0.5 - n / 2) * dx - hit.offset,
-          yy = (y + 0.5 - n / 2) * dx;
+          yy = (y + 0.5 - n / 2) * dx + (hit.verticalOffset || 0);
         values[y * n + x] =
           ((2 * hit.power) / (Math.PI * hit.radius * hit.radius)) *
           Math.exp((-2 * (xx * xx + yy * yy)) / (hit.radius * hit.radius)) *
@@ -588,6 +616,7 @@ function renderResults() {
     );
   $("#results-panel").classList.toggle("collapsed", !showResults);
   if (!showResults) return;
+  if (resultTab === "alignment") return renderAlignment(body);
   if (resultTab === "checks") {
     const checks = allChecks();
     body.innerHTML = `<div class="checks-list">${checks.length ? checks.map((w) => `<button data-action="select" data-id="${w.id || ""}" class="check ${w.level}">${icon(w.level === "error" ? "warning" : "info")}<span>${esc(w.text)}</span>${icon("chevron", 14)}</button>`).join("") : `<div class="check success">${icon("check")}<span>No placement or path issues detected within the supported model.</span></div>`}<p class="field-note">Checks cover approximate footprints, table bounds, beam interception, coating-range metadata and paraxial incidence. They do not certify mechanical fit or damage thresholds.</p></div>`;
@@ -675,6 +704,56 @@ function renderResults() {
       plotProfile(display);
     }
   }
+}
+function renderAlignment(body) {
+  const targets = alignmentTargets(project, result),
+    pair = pairAlignment(targets),
+    c = selectedItem(),
+    axis = sideAxis,
+    limit = axis === "x" ? project.table.width : project.table.height;
+  const zmax = Math.max(
+    150,
+    ...project.items.map(
+      (c) => (c.z ?? project.table.heightAbove) + c.diameter / 2 + 20,
+    ),
+    ...result.segments.map((s) => (s.z1 ?? 100) + 20),
+    ...project.items
+      .filter((c) => c.mountType && c.mountType !== "none")
+      .map((c) => c.postLength + mountModels[c.mountType].base + 20),
+  );
+  const px = (v) => 45 + (v / limit) * 800,
+    pz = (z) => 175 - (z / zmax) * 150;
+  const sideMount = (o) => {
+    const x = px(o[axis]),
+      z = o.z ?? project.table.heightAbove;
+    if (!o.mountType || o.mountType === "none")
+      return `<path d="M${x} 175V${pz(z)}" stroke="#435361" stroke-width="3" stroke-dasharray="3 3"/>`;
+    const base = mountModels[o.mountType].base,
+      top = base + o.postLength;
+    return `${o.mountType === "xyz" ? `<rect x="${px(o[axis === "x" ? "stageOriginX" : "stageOriginY"]) - 14}" y="${pz(base)}" width="28" height="${175 - pz(base)}" fill="#425c70" stroke="#8aafc9"/>` : ""}<path d="M${x} ${pz(base)}V${pz(top)}" stroke="#909da9" stroke-width="5"/><path d="M${x} ${pz(top)}V${pz(z)}" stroke="#5f91a7" stroke-width="8"/>`;
+  };
+  const svg = `<svg id="alignment-side-svg" viewBox="0 0 900 205" role="img" aria-label="${axis.toUpperCase()} Z side elevation of optical table"><rect x="45" y="175" width="800" height="8" fill="#657585"/>${[0, 0.5, 1].map((f) => `<path d="M45 ${pz(f * zmax)}H845" stroke="#344757" stroke-dasharray="4 5"/><text x="38" y="${pz(f * zmax) + 4}" text-anchor="end" fill="#a7bbc9" font-size="12">${fmt(f * zmax, 0)}</text>`).join("")}${project.items
+    .filter((o) => o.enabled !== false)
+    .map(
+      (o) =>
+        `<g data-action="select" data-id="${o.id}" style="cursor:pointer"><title>${esc(o.label)} · Z ${fmt(o.z ?? project.table.heightAbove, 3)} mm</title>${sideMount(o)}<rect x="${px(o[axis]) - 7}" y="${pz(o.z ?? project.table.heightAbove) - Math.max(4, (o.diameter / zmax) * 75)}" width="14" height="${Math.max(8, (o.diameter / zmax) * 150)}" fill="#263b4b" stroke="${selected.has(o.id) ? "#c5ed96" : "#9aaebd"}"/><text x="${px(o[axis])}" y="${pz(o.z ?? project.table.heightAbove) - (o.diameter / zmax) * 75 - 7}" text-anchor="middle" fill="#c6d8e5" font-size="12">${o.id}</text></g>`,
+    )
+    .join(
+      "",
+    )}${result.segments.map((s) => `<path d="M${px(s.from[axis])} ${pz(s.z0 ?? 100)}L${px(s.to[axis])} ${pz(s.z1 ?? 100)}" stroke="${s.branch % 2 ? "#8ccaf6" : "#c3ec87"}" stroke-width="1.5" fill="none"/>`).join("")}<text x="45" y="202" fill="#9fb3c4" font-size="12">0</text><text x="390" y="202" fill="#9fb3c4" font-size="12">${axis.toUpperCase()} position (mm) · Z above table (mm)</text><text x="845" y="202" text-anchor="end" fill="#9fb3c4" font-size="12">${limit}</text></svg>`;
+  const cards = targets
+    .slice(0, 6)
+    .map((t) => {
+      const radius = t.radius,
+        scale = 32 / Math.max(radius, 0.01),
+        x = 50 + clamp(t.dx || 0, -radius * 1.2, radius * 1.2) * scale,
+        z = 50 - clamp(t.dz || 0, -radius * 1.2, radius * 1.2) * scale;
+      return `<button class="alignment-target" data-action="select" data-id="${t.component.id}"><span>${esc(t.component.label)}</span><svg viewBox="0 0 100 100" aria-label="Horizontal and vertical beam centroid target"><circle cx="50" cy="50" r="32" fill="#14202c" stroke="#698295"/><path d="M10 50H90M50 10V90" stroke="#486173"/>${t.h ? `<circle cx="${x}" cy="${z}" r="4" fill="${t.status === "Centred" ? "#bdf68f" : "#edc089"}"/>` : ""}</svg><strong>${t.status}</strong><small>H ${fmt(t.dx, 3)} / V ${fmt(t.dz, 3)} mm</small><small>1/e² edge margin ${fmt(t.clearance, 3)} mm</small>${t.arrivals.length > 1 ? "<small>First arrival shown · multiple paths</small>" : ""}</button>`;
+    })
+    .join("");
+  const adjust = (axis, label) =>
+    `<div><span>${label}</span><button data-action="alignment-nudge" data-axis="${axis}" data-sign="-1" aria-label="Decrease ${label}">−</button><button data-action="alignment-nudge" data-axis="${axis}" data-sign="1" aria-label="Increase ${label}">+</button></div>`;
+  body.innerHTML = `<div class="alignment-instruments"><div class="alignment-elevation"><div class="alignment-heading"><strong>Synchronized side elevation</strong><select id="side-axis" aria-label="Side elevation axis"><option value="x" ${axis === "x" ? "selected" : ""}>X–Z</option><option value="y" ${axis === "y" ? "selected" : ""}>Y–Z</option></select>${button("export-alignment", "Mount CSV", "download", "outline")}</div>${svg}<p class="field-note">Side view projects all branches onto the selected axis. Vertical rays use a first-order small-angle model (±1°); horizontal distances drive propagation.</p></div><div class="alignment-targets">${cards || "<p>Add two iris apertures to inspect beam centring, or open the Two-mirror alignment setup.</p>"}</div><div class="alignment-summary">${pair ? `<strong>Dual iris: ${pair.centred ? "centred within 0.05 mm" : "adjust mirrors"}</strong><span>Relative target slope H ${fmt(pair.horizontalMrad, 4)} / V ${fmt(pair.verticalMrad, 4)} mrad · separation ${fmt(pair.separation, 1)} mm</span>` : "<span>Dual-iris slope requires two parallel irises reached by the same optical branch.</span>"}</div><div class="alignment-adjust"><strong>${c ? esc(c.label) : "Select a component for fine adjustment"}</strong><label>Angle step<input id="alignment-angle-step" type="number" min=".001" max="10" step=".001" value="${alignmentAngleStep}">mrad</label><label>Position step<input id="alignment-position-step" type="number" min=".001" max="10" step=".001" value="${alignmentPositionStep}">mm</label>${c ? `${["source", "image", "mirror", "splitter"].includes(c.type) ? adjust("angle", "Yaw") + adjust("pitch", "Elevation") : ""}${adjust("z", "Height")}${c.mountType === "xyz" ? adjust("x", "Stage X") + adjust("y", "Stage Y") : ""}` : ""}</div><p class="field-note">Walk the beam through the near and far irises with alternating mirror adjustments. A negative edge margin indicates potential clipping. Fine stage controls enforce travel; other edits report out-of-travel positions in Design checks.</p></div>`;
 }
 function getFringes(det) {
   const key = snapshot() + det.id + noise;
@@ -1006,10 +1085,12 @@ function bind() {
       };
       renderInspector();
       drawBench();
+      if (resultTab === "alignment") renderResults();
     } else {
       if (!e.shiftKey) selected.clear();
       renderInspector();
       drawBench();
+      if (resultTab === "alignment") renderResults();
     }
     if (dragState) $("#bench").setPointerCapture(e.pointerId);
   });
@@ -1320,6 +1401,84 @@ function handleClick(e) {
     return;
   }
   switch (a) {
+    case "show-alignment":
+      resultTab = "alignment";
+      showResults = true;
+      renderResults();
+      break;
+    case "stage-rebase": {
+      const c = selectedItem();
+      if (!c) return;
+      if (c.locked)
+        return notify("Unlock the component before relocating its base.");
+      checkpoint();
+      c.stageOriginX = c.x;
+      c.stageOriginY = c.y;
+      c.stageOriginZ = c.z;
+      commit();
+      break;
+    }
+    case "alignment-nudge": {
+      const c = selectedItem();
+      if (!c) return notify("Select a source, mirror or mounted optic first.");
+      const axis = b.dataset.axis,
+        delta =
+          +b.dataset.sign *
+          (["angle", "pitch"].includes(axis)
+            ? (alignmentAngleStep * 180) / Math.PI / 1000
+            : alignmentPositionStep),
+        before = snapshot();
+      try {
+        const next = stageMove(c, axis, delta);
+        project.items = project.items.map((o) => (o.id === c.id ? next : o));
+        project = validateProject(project);
+        history.push(before);
+        redo = [];
+        commit();
+      } catch (error) {
+        project = JSON.parse(before);
+        notify(error.message);
+      }
+      break;
+    }
+    case "export-alignment":
+      download(
+        "optibench-alignment.csv",
+        csv([
+          [
+            "id",
+            "label",
+            "x_mm",
+            "y_mm",
+            "z_mm",
+            "normal_deg",
+            "elevation_deg",
+            "mount",
+            "post_mm",
+            "thread",
+            "stage_x_offset_mm",
+            "stage_y_offset_mm",
+            "stage_z_offset_mm",
+          ],
+          ...project.items.map((c) => [
+            c.id,
+            c.label,
+            c.x,
+            c.y,
+            c.z,
+            c.angle,
+            c.pitch,
+            c.mountType,
+            c.postLength,
+            c.mountThread,
+            c.x - c.stageOriginX,
+            c.y - c.stageOriginY,
+            c.z - c.stageOriginZ,
+          ]),
+        ]),
+        "text/csv",
+      );
+      break;
     case "measurements":
       measurementWorkspace.open();
       break;
@@ -1398,6 +1557,10 @@ function handleClick(e) {
       resultTab = "detector";
       closeDialog();
       setProject(makeProject(b.dataset.template));
+      if (b.dataset.template === "alignment") {
+        resultTab = "alignment";
+        renderResults();
+      }
       break;
     case "phase-scan":
       try {
@@ -1479,6 +1642,7 @@ function handleClick(e) {
         if ($("#dialog").open) closeDialog();
         renderInspector();
         drawBench();
+        if (resultTab === "alignment") renderResults();
         if (innerWidth < 1280) openDrawer("inspector");
       }
       break;
@@ -1599,6 +1763,20 @@ function handleClick(e) {
 }
 function handleChange(e) {
   const el = e.target;
+  if (el.id === "side-axis") {
+    sideAxis = el.value;
+    renderResults();
+    return;
+  }
+  if (el.id === "alignment-angle-step" || el.id === "alignment-position-step") {
+    if (!el.checkValidity()) {
+      el.reportValidity();
+      return;
+    }
+    if (el.id === "alignment-angle-step") alignmentAngleStep = +el.value;
+    else alignmentPositionStep = +el.value;
+    return;
+  }
   if (el.dataset.compare) {
     if (el.checked && compare.size >= 4) {
       el.checked = false;
@@ -1612,7 +1790,12 @@ function handleChange(e) {
   if (el.dataset.field) {
     const c = selectedItem();
     if (!c) return;
-    if (c.locked && ["x", "y", "angle"].includes(el.dataset.field)) {
+    if (
+      c.locked &&
+      ["x", "y", "z", "pitch", "angle", "mountType", "postLength"].includes(
+        el.dataset.field,
+      )
+    ) {
       renderInspector();
       return notify("Unlock this component before moving it.");
     }
@@ -1628,6 +1811,17 @@ function handleChange(e) {
             ? +el.value
             : el.value;
     c[el.dataset.field] = value;
+    if (el.dataset.field === "mountType" && value !== "none") {
+      c.z ??= project.table.heightAbove;
+      c.postLength = Math.max(0, c.z - mountModels[value].base - 25);
+      c.mountThread = project.table.thread;
+      if (value === "xyz") {
+        c.stageOriginX = c.x;
+        c.stageOriginY = c.y;
+        c.stageOriginZ = c.z;
+        c.footprint = Math.max(c.footprint, 60);
+      }
+    }
     try {
       const p = validateProject(project);
       history.push(before);
@@ -1650,6 +1844,10 @@ function handleChange(e) {
   }
   if (el.id === "mode") {
     mode = el.value;
+    if (mode === "Alignment") {
+      resultTab = "alignment";
+      showResults = true;
+    }
     project.solver = mode;
     saveLocal();
     waveResult = null;
@@ -1699,7 +1897,7 @@ function tableDialog() {
   const t = project.table;
   modal(
     "Laboratory optical table",
-    `<form data-form="table"><p class="dialog-note">An orthographic layout in millimetres. Hole centers and component positions share the same coordinate system.</p><div class="two-col"><label class="field"><span>Width (mm)</span><input name="width" type="number" min="300" max="6000" required value="${t.width}"></label><label class="field"><span>Depth (mm)</span><input name="height" type="number" min="300" max="4000" required value="${t.height}"></label></div><label class="field"><span>Thread and hole layout</span><select name="standard"><option value="metric" ${t.thread === "M6" ? "selected" : ""}>M6 · 25 mm centers · 12.5 mm border</option><option value="imperial" ${t.thread !== "M6" ? "selected" : ""}>¼″–20 · 25.4 mm centers · 12.7 mm border</option></select></label><div class="two-col"><label class="field"><span>Movement snap (mm; 0 = free)</span><input name="snap" type="number" step="any" min="0" max="100" value="${t.snap}" required></label><label class="field"><span>Beam height (mm; layout metadata)</span><input name="heightAbove" type="number" min="0" max="1000" value="${t.heightAbove}" required></label></div><label class="checkbox-row"><input name="snapToHoles" type="checkbox" ${t.snapToHoles ? "checked" : ""}>Snap the selected anchor to mounting-hole centers</label><label class="checkbox-row"><input name="showMounts" type="checkbox" ${t.showMounts ? "checked" : ""}>Show mounting envelopes</label><p class="dialog-note">The model is two-dimensional. Beam height is recorded for your laboratory build; vertical propagation and mount geometry are not solved.</p><a class="source-link" href="https://www.thorlabs.com/newgrouppage9.cfm?objectgroup_id=7154&pn=B1824F" target="_blank" rel="noopener">Manufacturer hole-spacing reference ${icon("external", 14)}</a><div class="dialog-actions"><button type="submit" class="accent">Apply table settings</button>${button("clear-measures", "Clear measurements", "trash", "outline")}</div></form>`,
+    `<form data-form="table"><p class="dialog-note">An orthographic layout in millimetres. Hole centers and component positions share the same coordinate system.</p><div class="two-col"><label class="field"><span>Width (mm)</span><input name="width" type="number" min="300" max="6000" required value="${t.width}"></label><label class="field"><span>Depth (mm)</span><input name="height" type="number" min="300" max="4000" required value="${t.height}"></label></div><label class="field"><span>Thread and hole layout</span><select name="standard"><option value="metric" ${t.thread === "M6" ? "selected" : ""}>M6 · 25 mm centers · 12.5 mm border</option><option value="imperial" ${t.thread !== "M6" ? "selected" : ""}>¼″–20 · 25.4 mm centers · 12.7 mm border</option></select></label><div class="two-col"><label class="field"><span>Movement snap (mm; 0 = free)</span><input name="snap" type="number" step="any" min="0" max="100" value="${t.snap}" required></label><label class="field"><span>Default height for new optics (mm)</span><input name="heightAbove" type="number" min="1" max="1000" value="${t.heightAbove}" required></label></div><label class="checkbox-row"><input name="snapToHoles" type="checkbox" ${t.snapToHoles ? "checked" : ""}>Snap the selected anchor to mounting-hole centers</label><label class="checkbox-row"><input name="showMounts" type="checkbox" ${t.showMounts ? "checked" : ""}>Show mounting envelopes</label><p class="dialog-note">Changing the default height does not move existing optics. Set each optic’s height and mount in the inspector; use Alignment to inspect the first-order elevation trace.</p><a class="source-link" href="https://www.thorlabs.com/newgrouppage9.cfm?objectgroup_id=7154&pn=B1824F" target="_blank" rel="noopener">Manufacturer hole-spacing reference ${icon("external", 14)}</a><div class="dialog-actions"><button type="submit" class="accent">Apply table settings</button>${button("clear-measures", "Clear measurements", "trash", "outline")}</div></form>`,
   );
 }
 function templateDialog() {
@@ -2101,7 +2299,7 @@ async function handleSubmit(e) {
 function guideDialog() {
   modal(
     "Model reference & laboratory workflow",
-    `<div class="guide"><section><h3>Laboratory table</h3><p>All positions and footprints are in millimetres. X increases to the right and Y down the screen. Angles specify the surface normal; a source angle specifies its direction. A mirror normal of 135° turns a rightward beam downward. Hole patterns support M6 on 25 mm centers or ¼″–20 on 25.4 mm centers.</p><p>Click + in the inventory, then click the table to place a component. You can also drag inventory cards onto it. Drag parts, Shift-click to select several, and edit coordinates precisely. Middle-drag or H pans; the wheel zooms around the pointer. M measures between two points. V selects. F fits the table. R rotates 15°. Arrow keys move by one snap interval, Shift by ten. Ctrl/Cmd-Z undoes; Ctrl/Cmd-Shift-Z redoes.</p></section><section><h3>Gaussian model</h3><p>Complex q propagation in air: q′ = q + d, and q′ = q / (1 − q/f) at an ideal thin lens. Beam radius follows w² = M²λ|q|²/(π Im q). The initial source plane is a beam waist. Each surface is located by a two-dimensional intersection test. Plane mirrors reflect the propagation direction; splitters create separate power branches; polarizers apply Malus’ law.</p><p>Clear-aperture clipping uses a centered Gaussian estimate. Truncation, decenter, large lens incidence and catalog coating mismatches generate design checks. Lens incidence beyond 10° stops that path. Interfering branches are not coherently recombined by this solver. Source beams are traced independently.</p><a class="source-link" href="https://www.brown.edu/research/labs/mittleman/sites/brown.edu.research.labs.mittleman/files/uploads/lecture21_2.pdf" target="_blank" rel="noopener">Gaussian propagation reference ↗</a></section><section><h3>Interferometry</h3><p>Open a Michelson or Mach–Zehnder setup. This mode coherently combines up to two TEM00 paths from one laser. Plane mirrors, ideal reciprocal splitters (r = i√R, t = √T), ND filters and linear polarizers are supported. The model includes geometric path, Gaussian curvature, Gouy phase, mirror piston and Gaussian temporal coherence exp[−(OPD/Lc)²]. Piston changes phase by 4πd cos(incidence)/λ; it does not translate the mount.</p><p>The central-row fit estimates spatial frequency, visibility and phase from sampled simulated data after normalization by the modeled noninterfering envelope. The phase is relative to sensor x = 0 and cannot alone determine absolute path difference. Scan records the central pixel while moving one mirror through 2λ of piston. Camera noise and ADC settings apply. These are simulated measurements, not acquired laboratory frames. Lenses, clipped diffraction, coating-specific phase, vector polarization transport and environmental drift are outside this coherent folded-path model.</p><a class="source-link" href="https://web.physics.ucsb.edu/~lecturedemonstrations/Composer/Pages/84%5B1%5D.30a.html" target="_blank" rel="noopener">Michelson phase and visibility reference ↗</a></section><section><h3>Ray model</h3><p>Thirteen paraxial rays per source are traced in the table plane. Rays refract through thin lenses, reflect, split, or stop at apertures and detectors. The detector’s Gaussian cross-section remains a separate ABCD reference; a ray bundle is not a wave-optical PSF.</p></section><section><h3>Fourier model</h3><p>A 128², 256², 512² or 1024² scalar complex field is propagated using a two-dimensional FFT angular-spectrum operator. Thin-lens phase, circular apertures, slits, neutral-density transmission and linear polarizers operate on the sampled field. Uploaded image intensity becomes field amplitude via a square root. Only one coherent M² = 1 source and straight, parallel optical planes are supported. Folded or split wave paths fail explicitly.</p><p>The finite FFT grid is periodic. Warnings report significant edge energy and undersampled lens phase; choose field width and resolution carefully and check convergence. Reported D4σ widths are second-moment widths. The solver does not include vector electromagnetic fields, surface prescriptions, dispersion, nonlinear optics, grating orders or thick-lens aberrations.</p></section><section><h3>Camera model</h3><p>Native-pixel photoelectrons are computed from incident irradiance, pixel area, exposure, wavelength and QE. Optional Poisson photon/dark noise and Gaussian read noise precede full-well clipping, digital gain and ADC quantization. The displayed image samples this model onto a reduced preview grid; it is not a full-resolution readout. Catalog camera dimensions are sourced; QE, read noise, dark current, full well and gain are editable assumptions.</p></section><section><h3>Catalog provenance & project files</h3><p>Every manufacturer reference links to its source. Some are archived specifications. No live stock, price or measured coating feed is connected. Ideal and custom components are explicitly identified. Changing a catalog parameter is shown as a model override. A parts list is a starting point for procurement, not a verified assembly.</p><p>Projects autosave in this browser and can be exported as versioned JSON including source images. Keep downloaded backups for long-term retention. The app imports the earlier OptiBench project format. Table drawings export as SVG; bill of materials, optical path and tolerance samples export as CSV.</p></section></div>`,
+    `<div class="guide"><section><h3>Laboratory table</h3><p>All positions and footprints are in millimetres. X increases to the right and Y down the screen. Angles specify the surface normal; a source angle specifies its direction. A mirror normal of 135° turns a rightward beam downward. Hole patterns support M6 on 25 mm centers or ¼″–20 on 25.4 mm centers.</p><p>Click + in the inventory, then click the table to place a component. You can also drag inventory cards onto it. Drag parts, Shift-click to select several, and edit coordinates precisely. Middle-drag or H pans; the wheel zooms around the pointer. M measures between two points. V selects. F fits the table. R rotates 15°. Arrow keys move by one snap interval, Shift by ten. Ctrl/Cmd-Z undoes; Ctrl/Cmd-Shift-Z redoes.</p></section><section><h3>Height, mounts and alignment</h3><p>Open Setups → Two-mirror alignment. The Alignment tab combines an X–Z or Y–Z side projection with near/far iris targets and fine adjustment controls. Coordinates use millimetres; positive elevation points upward. Source elevation and mirror-normal elevation are limited to ±1°. The vertical trace uses z′ = z + L·slope and the first-order reflected slope s′ = s − 2(d·n)·pitch. Thin lenses steer vertical decenter toward the focal plane. Plan-view path lengths remain the propagation distances.</p><p>Grey posts and blue holders depict editable parametric assemblies. Holder extension spans 0–50 mm; the XYZ stage has a 15 mm modeled base and editable symmetric travel. Fine stage controls enforce travel; direct edits outside travel generate design checks. Base threads, optic capacity and table clearance are checked, but these assemblies are not verified manufacturer parts.</p><p>Two parallel irises with one shared, uninterrupted branch define the relative pointing error. Green centring means centroid error below 0.05 mm. The edge margin subtracts the Gaussian 1/e² radius; a negative margin flags potential clipping. Wave solvers require coplanar components and zero elevation tilt; they do not claim three-dimensional coherent propagation.</p></section><section><h3>Gaussian model</h3><p>Complex q propagation in air: q′ = q + d, and q′ = q / (1 − q/f) at an ideal thin lens. Beam radius follows w² = M²λ|q|²/(π Im q). The initial source plane is a beam waist. Each surface is located by a two-dimensional intersection test. Plane mirrors reflect the propagation direction; splitters create separate power branches; polarizers apply Malus’ law.</p><p>Clear-aperture clipping uses a centered Gaussian estimate. Truncation, decenter, large lens incidence and catalog coating mismatches generate design checks. Lens incidence beyond 10° stops that path. Interfering branches are not coherently recombined by this solver. Source beams are traced independently.</p><a class="source-link" href="https://www.brown.edu/research/labs/mittleman/sites/brown.edu.research.labs.mittleman/files/uploads/lecture21_2.pdf" target="_blank" rel="noopener">Gaussian propagation reference ↗</a></section><section><h3>Interferometry</h3><p>Open a Michelson or Mach–Zehnder setup. This mode coherently combines up to two TEM00 paths from one laser. Plane mirrors, ideal reciprocal splitters (r = i√R, t = √T), ND filters and linear polarizers are supported. The model includes geometric path, Gaussian curvature, Gouy phase, mirror piston and Gaussian temporal coherence exp[−(OPD/Lc)²]. Piston changes phase by 4πd cos(incidence)/λ; it does not translate the mount.</p><p>The central-row fit estimates spatial frequency, visibility and phase from sampled simulated data after normalization by the modeled noninterfering envelope. The phase is relative to sensor x = 0 and cannot alone determine absolute path difference. Scan records the central pixel while moving one mirror through 2λ of piston. Camera noise and ADC settings apply. These are simulated measurements, not acquired laboratory frames. Lenses, clipped diffraction, coating-specific phase, vector polarization transport and environmental drift are outside this coherent folded-path model.</p><a class="source-link" href="https://web.physics.ucsb.edu/~lecturedemonstrations/Composer/Pages/84%5B1%5D.30a.html" target="_blank" rel="noopener">Michelson phase and visibility reference ↗</a></section><section><h3>Ray model</h3><p>Thirteen paraxial rays per source are traced in the table plane. Rays refract through thin lenses, reflect, split, or stop at apertures and detectors. The detector’s Gaussian cross-section remains a separate ABCD reference; a ray bundle is not a wave-optical PSF.</p></section><section><h3>Fourier model</h3><p>A 128², 256², 512² or 1024² scalar complex field is propagated using a two-dimensional FFT angular-spectrum operator. Thin-lens phase, circular apertures, slits, neutral-density transmission and linear polarizers operate on the sampled field. Uploaded image intensity becomes field amplitude via a square root. Only one coherent M² = 1 source and straight, parallel optical planes are supported. Folded or split wave paths fail explicitly.</p><p>The finite FFT grid is periodic. Warnings report significant edge energy and undersampled lens phase; choose field width and resolution carefully and check convergence. Reported D4σ widths are second-moment widths. The solver does not include vector electromagnetic fields, surface prescriptions, dispersion, nonlinear optics, grating orders or thick-lens aberrations.</p></section><section><h3>Camera model</h3><p>Native-pixel photoelectrons are computed from incident irradiance, pixel area, exposure, wavelength and QE. Optional Poisson photon/dark noise and Gaussian read noise precede full-well clipping, digital gain and ADC quantization. The displayed image samples this model onto a reduced preview grid; it is not a full-resolution readout. Catalog camera dimensions are sourced; QE, read noise, dark current, full well and gain are editable assumptions.</p></section><section><h3>Catalog provenance & project files</h3><p>Every manufacturer reference links to its source. Some are archived specifications. No live stock, price or measured coating feed is connected. Ideal and custom components are explicitly identified. Changing a catalog parameter is shown as a model override. A parts list is a starting point for procurement, not a verified assembly.</p><p>Projects autosave in this browser and can be exported as versioned JSON including source images. Keep downloaded backups for long-term retention. The app imports the earlier OptiBench project format. Table drawings export as SVG; bill of materials, optical path and tolerance samples export as CSV.</p></section></div>`,
     true,
   );
 }

@@ -142,6 +142,21 @@ export function solveWave(
   if (srcs.length !== 1)
     throw Error("Fourier propagation requires exactly one coherent source.");
   const src = srcs[0];
+  if (
+    project.items.some(
+      (c) =>
+        c.enabled !== false &&
+        c.type !== "mechanical" &&
+        ((c.pitch || 0) !== 0 ||
+          Math.abs(
+            (c.z ?? project.table.heightAbove ?? 100) -
+              (src.z ?? project.table.heightAbove ?? 100),
+          ) > 1e-6),
+    )
+  )
+    throw Error(
+      "Fourier propagation requires a common beam height and zero elevation tilt. Use Alignment to inspect vertical offsets.",
+    );
   if (src.type === "image" && src.pattern === "image" && !imageData)
     throw Error(
       "Upload a source image before selecting the uploaded-image field.",

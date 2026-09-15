@@ -145,7 +145,7 @@ test("parts and template dialogs populate from the active project", () => {
   assert.match(el("#dialog-body").textContent, /6 placed components/);
   closeDialog();
   click('[data-action="templates"]');
-  assert.equal(document.querySelectorAll(".template-card").length, 9);
+  assert.equal(document.querySelectorAll(".template-card").length, 10);
   closeDialog();
 });
 test("template switching traces folded paths and leaves prior project undoable", () => {
@@ -291,4 +291,39 @@ test("measurement workspace captures the current interferometer without editing 
   assert.equal(JSON.stringify(read().project), before);
   click('[data-measure="close"]');
   assert.equal(el("#measurement-workspace").hidden, true);
+});
+
+test("alignment instruments synchronize height edits, fine stages, side projection and undo", () => {
+  click('[data-action="templates"]');
+  click('[data-template="alignment"]');
+  assert.equal(el("#mode").value, "Alignment");
+  assert.ok(el("#alignment-side-svg"));
+  assert.match(el(".alignment-summary").textContent, /adjust mirrors/);
+  click('.alignment-target[data-id="5"]');
+  assert.equal(
+    el('[data-field="mountType"]').value,
+    "xyz",
+    el('[data-field="label"]').value +
+      " " +
+      el('[data-field="mountType"]').outerHTML,
+  );
+  const before = read().project.items.find((c) => c.id === 5).z;
+  click('[data-action="alignment-nudge"][data-axis="z"][data-sign="1"]');
+  assert.ok(
+    Math.abs(read().project.items.find((c) => c.id === 5).z - before - 0.1) <
+      1e-9,
+  );
+  assert.match(el("#alignment-side-svg").textContent, /100.100/);
+  click('[data-action="undo"]');
+  assert.equal(read().project.items.find((c) => c.id === 5).z, before);
+  change("#side-axis", "y");
+  assert.match(el("#alignment-side-svg").getAttribute("aria-label"), /Y Z/);
+  click('.alignment-target[data-id="5"]');
+  change('[data-field="z"]', 130);
+  click('[data-action="result-checks"]');
+  assert.match(el("#results-body").textContent, /travel/);
+  assert.equal(
+    JSON.parse(localStorage.getItem("optibench-lab-v2")).items[4].z,
+    130,
+  );
 });

@@ -31,6 +31,17 @@ export function coherentField(project, detectorId, { n = 256, width } = {}) {
   for (const h of paths)
     for (const p of h.path) {
       const c = project.items.find((c) => c.id === p.id);
+      if (
+        (source.pitch || 0) !== 0 ||
+        (c.pitch || 0) !== 0 ||
+        Math.abs(
+          (c.z ?? project.table.heightAbove ?? 100) -
+            (source.z ?? project.table.heightAbove ?? 100),
+        ) > 1e-6
+      )
+        throw Error(
+          "Folded coherent fields require a common beam height and zero elevation tilt. Use Alignment for the paraxial elevation trace.",
+        );
       if (!allowed.includes(c.type))
         throw Error(
           "Coherent folded paths currently support plane mirrors, ideal splitters, ND filters and linear polarizers. Remove lenses or apertures from this path.",

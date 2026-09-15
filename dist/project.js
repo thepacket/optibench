@@ -1,5 +1,5 @@
 import { catalog, instantiate } from "./catalog.js";
-export const ENGINE_VERSION = "0.4.0";
+export const ENGINE_VERSION = "0.5.0";
 export const DEFAULT_TABLE = {
   width: 1500,
   height: 900,
@@ -16,11 +16,14 @@ export function makeProject(template = "expander") {
     version: 2,
     engine: ENGINE_VERSION,
     title: "Beam expansion & power monitoring",
-    solver: ["michelson", "mach-zehnder"].includes(template)
-      ? "Interferometry"
-      : ["relay", "diffraction"].includes(template)
-        ? "Fourier"
-        : "Gaussian",
+    solver:
+      template === "alignment"
+        ? "Alignment"
+        : ["michelson", "mach-zehnder"].includes(template)
+          ? "Interferometry"
+          : ["relay", "diffraction"].includes(template)
+            ? "Fourier"
+            : "Gaussian",
     notes: "",
     table: { ...DEFAULT_TABLE },
     items: [],
@@ -170,12 +173,63 @@ export function makeProject(template = "expander") {
       });
     }
   }
+  if (template === "alignment") {
+    p.title = "Two-mirror alignment · dual iris";
+    add("DESIGN-LASER-633", 150, 450, {
+      waist: 0.3,
+      angle: 0.03,
+      pitch: 0.015,
+      z: 100,
+      mountType: "post",
+      label: "L1 · Alignment laser",
+    });
+    add("DESIGN-MIRROR-25.4", 350, 450, {
+      angle: 135,
+      z: 100,
+      mountType: "kinematic",
+      label: "M1 · Near steering mirror",
+    });
+    add("DESIGN-MIRROR-25.4", 350, 650, {
+      angle: 135,
+      z: 100,
+      mountType: "kinematic",
+      label: "M2 · Far steering mirror",
+    });
+    add("DESIGN-IRIS-1", 650, 650, {
+      angle: 0,
+      z: 100,
+      aperture: 4,
+      mountType: "post",
+      label: "A1 · Near alignment iris",
+    });
+    add("DESIGN-IRIS-1", 1000, 650, {
+      angle: 0,
+      z: 100,
+      aperture: 4,
+      mountType: "xyz",
+      postLength: 60,
+      label: "A2 · Far alignment iris",
+    });
+    add("DESIGN-SCREEN-50", 1250, 650, {
+      angle: 0,
+      z: 100,
+      mountType: "post",
+      terminate: true,
+      label: "D1 · Alignment screen",
+    });
+  }
   if (template === "empty") {
     p.title = "Untitled experiment";
   }
   return p;
 }
 export const templates = [
+  [
+    "alignment",
+    "Two-mirror alignment",
+    "Steering mirrors, two iris targets, adjustable posts and a translation stage.",
+    "Alignment",
+  ],
   [
     "michelson",
     "Michelson interferometer",
@@ -293,6 +347,37 @@ export function validateProject(input) {
         notes: text(c.notes, 2000),
         x: number(c.x, 0, table.width, "X position"),
         y: number(c.y, 0, table.height, "Y position"),
+        z: number(c.z ?? table.heightAbove, 1, 1000, "optic axis height"),
+        pitch: number(c.pitch ?? 0, -1, 1, "elevation angle"),
+        mountType: ["none", "post", "kinematic", "xyz"].includes(c.mountType)
+          ? c.mountType
+          : "none",
+        mountThread: text(c.mountThread ?? table.thread, 30),
+        postLength: number(c.postLength ?? 75, 0, 1000, "post length"),
+        stageOriginX: number(
+          c.stageOriginX ?? c.x,
+          0,
+          table.width,
+          "stage X origin",
+        ),
+        stageOriginY: number(
+          c.stageOriginY ?? c.y,
+          0,
+          table.height,
+          "stage Y origin",
+        ),
+        stageOriginZ: number(
+          c.stageOriginZ ?? c.z ?? table.heightAbove,
+          1,
+          1000,
+          "stage Z origin",
+        ),
+        stageTravel: number(
+          c.stageTravel ?? 12.5,
+          0.01,
+          100,
+          "stage half travel",
+        ),
         angle: number(c.angle ?? 0, -3600, 3600, "angle"),
         enabled: c.enabled !== false,
         locked: !!c.locked,
@@ -425,9 +510,13 @@ export function validateProject(input) {
   return {
     version: 2,
     engine: ENGINE_VERSION,
-    solver: ["Gaussian", "Rays", "Fourier", "Interferometry"].includes(
-      input.solver,
-    )
+    solver: [
+      "Gaussian",
+      "Rays",
+      "Fourier",
+      "Interferometry",
+      "Alignment",
+    ].includes(input.solver)
       ? input.solver
       : "Gaussian",
     title: text(input.title, 100) || "Untitled experiment",
