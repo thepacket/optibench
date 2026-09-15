@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { Window } from 'happy-dom';
 import { bindResultsSplitter } from '../dist/results-splitter.js';
 test('splitter keyboard resizing is bounded, persists, expands and resets', () => {
- const w=new Window();globalThis.window=w;globalThis.localStorage=w.localStorage;
+ const w=new Window();globalThis.window=w;globalThis.CustomEvent=w.CustomEvent;globalThis.localStorage=w.localStorage;
  globalThis.ResizeObserver=class {observe(){} disconnect(){}};
  w.document.body.innerHTML='<main><header></header><div class="bench-stage"></div><div id="handle"></div><section></section></main>';
  const workspace=w.document.querySelector('main'),panel=w.document.querySelector('section'),handle=w.document.querySelector('#handle');

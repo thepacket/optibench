@@ -208,3 +208,7 @@ A full workflow test verifies nine completed acquisitions, a nonconstant center 
 ## v0.19 alignment practice
 
 Tests verify the challenge starts below the practice targets, reference correction improves visibility, usable area and beam separation, and source inputs remain unchanged. Both evidence archives and layouts round-trip through project backup validation. Invalid offsets reject, failed results cannot export as valid comparisons, and deterioration/recovery hints are exercised. This remains a synthetic scalar paraxial model.
+
+## Adjustable workspace verification
+
+Tests cover independent layout profile saves, reset, maximize state, invalid saved dimensions, and integration with the bounded results divider. Browser checks verified both side dividers, profile selection/save/reset, and bench/detector maximization. Effective CSS viewports of 1440×900 and 600×500 were checked under the in-app browser's existing display scaling; compact controls fit without horizontal toolbar overflow and the workspace scrolls when height is constrained. Browser zoom keyboard shortcuts did not change the in-app viewport, so a separate 200% browser-zoom setting was not verified.

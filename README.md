@@ -181,3 +181,9 @@ Open **Practice** on the bench rail. Start with a Michelson mirror yaw offset of
 The live comparison tracks visibility, usable area and beam-center separation against the initial result. Center separation is a geometric overlap proxy, not an overlap integral. Instructional targets are visibility ≥0.5, usable area ≥0.75, separation ≤0.5 mm; meeting them is not instrument certification. Per-layout normalization means image brightness is not an absolute power comparison. Hints respond to lost paths, increased separation or reduced usable area.
 
 Save the comparison project or export a Projects-compatible backup with both bench layouts and source acquisitions. Export HTML for a compact metric comparison with exact layouts and settings. Results must be valid before saving, but need not meet the practice targets. Unsaved practice state is lost on reload.
+
+## Adjustable workspace layouts
+
+Use the **Workspace** controls above the bench to select Design, Alignment or Measurement. Resize inventory and inspector by dragging their inner edges or using Left/Right arrows on the focused divider. The detector divider still supports dragging and Up/Down keys. **Save layout** stores the current sizes in the selected profile; **Reset layout** restores that profile's defaults. Preferences are local to this browser and separate from optical project data.
+
+**Maximize bench** and **Maximize detector** temporarily hide surrounding panels; the same button restores the workspace. At narrow widths, side panels use the existing Catalog/Inspector drawers instead of dividers. Preferred widths are constrained to preserve working space, and controls wrap at small sizes. Maximized mode is temporary and is not restored on reload.
