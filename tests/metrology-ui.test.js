@@ -269,3 +269,61 @@ test("repeat study workflow verifies acquisitions, exports and clears stale stud
   assert.equal($("#repeat-verified").checked, false);
   assert.match($(".measurement-quality").textContent, /Measurement quality/);
 });
+
+test("uncertainty calibration evaluates, persists and invalidates after edits", async () => {
+  const candidates = Array.from(records.values()).slice(-3);
+  for (const r of candidates) {
+    const el = $(`[data-repeat-id="${r.id}"]`);
+    if (!el.checked) {
+      el.checked = true;
+      el.dispatchEvent(new Event("change", { bubbles: true }));
+    }
+  }
+  let v = $("#repeat-verified");
+  v.checked = true;
+  v.dispatchEvent(new Event("change", { bubbles: true }));
+  await click("analyze-repeats");
+  await tick();
+  const mapView = $("#measurement-view");
+  mapView.value = "height";
+  mapView.dispatchEvent(new Event("change", { bubbles: true }));
+  const values = {
+    recordId: "CAL-TEST",
+    date: "2026-09-15",
+    references: "Test certificate",
+    scope: "Simulation only; zero terms justified for fixture",
+    wavelengthU: "1",
+    pixelU: "0.1",
+    angleU: "0",
+    stepU: "0",
+    otherPV: "1",
+    otherRMS: "1",
+    k: "2",
+    pvLimit: "10000",
+  };
+  for (const [key, value] of Object.entries(values)) {
+    const el = $(`[data-cal="${key}"]`);
+    el.value = value;
+    el.dispatchEvent(new Event("change", { bubbles: true }));
+  }
+  v = $("#uncertainty-verified");
+  v.checked = true;
+  v.dispatchEvent(new Event("change", { bubbles: true }));
+  $('[data-uncertainty="evaluate"]').click();
+  await tick();
+  assert.match($("#measurement-uncertainty").textContent, /Simulation only/);
+  assert.equal(
+    $('[data-uncertainty="json"]').disabled,
+    false,
+    $("#measurement-uncertainty").textContent,
+  );
+  await click("save");
+  const saved = Array.from(records.values()).at(-1);
+  assert.equal(saved.uncertainty.calibration.recordId, "CAL-TEST");
+  assert.ok(saved.uncertainty.budget.outputs.pv.expanded > 0);
+  const el = $('[data-cal="wavelengthU"]');
+  el.value = "2";
+  el.dispatchEvent(new Event("change", { bubbles: true }));
+  assert.equal($('[data-uncertainty="json"]').disabled, true);
+  assert.equal($("#uncertainty-verified").checked, false);
+});
