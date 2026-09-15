@@ -216,3 +216,7 @@ Tests cover independent layout profile saves, reset, maximize state, invalid sav
 ## Scientific dashboard checks
 
 Added end-to-end optical fixtures for Gaussian free-space radius, 13-ray thin-lens focusing, and Malus-law transmission. Tests verify expected/computed error limits, three sampling grids and saved sampling layout, incomplete/failed summary states, and escaped report content. Optical fixtures and sampling run in the existing cancellable validation worker. Run all clears previous results before starting, so cancellation leaves incomplete current evidence rather than a mixed historical success.
+
+### Native-pixel Michelson instrument acquisitions
+
+`instrument-lab.test.js` checks exact agreement with the shared camera response on the native central ROI, reproducibility for recorded seeds, differing samples for new seeds, approximately doubled unsaturated signal for doubled exposure, saturated-frame diagnostics, source-data reconstruction and repeat-condition/seed rejection. `instrument-ui.test.js` exercises acquisition, hidden/explicit truth, settings changes, repeats, local save and restoration. These are synthetic software checks. They do not establish physical camera calibration, pixel-integrated diffraction accuracy, phase-actuator accuracy, environmental drift or experimental uncertainty.

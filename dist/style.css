@@ -2909,3 +2909,26 @@ dialog::backdrop {
 @media(max-width:1279px){.inspector.drawer-open{top:var(--side-panel-top,160px);max-width:calc(100vw - 62px);}}
 @media(max-width:919px){.library.drawer-open{top:var(--side-panel-top,160px);max-width:calc(100vw - 62px);}.app-layout[data-inventory-collapsed="false"][data-inspector-collapsed="false"]>.drawer-open{width:calc((100vw - 62px)/2);}}
 @media(max-width:600px){.library.drawer-open{left:50px;max-width:calc(100vw - 50px);}.app-layout[data-inventory-collapsed="false"][data-inspector-collapsed="false"]>.drawer-open{width:calc((100vw - 50px)/2);}}
+
+/* Native-pixel instrument acquisition workspace. */
+#instrument-workspace{position:fixed;inset:0;z-index:130;background:#111923;color:#dfebf5;overflow:auto}
+#instrument-workspace[hidden]{display:none}
+.instrument-main{max-width:1500px;margin:auto;padding:20px 28px;font-size:16px;line-height:1.5}
+.instrument-grid{display:grid;grid-template-columns:minmax(250px,320px) minmax(0,1fr);gap:24px}
+.instrument-controls fieldset{border:1px solid #45586c;border-radius:6px;margin:0 0 18px;padding:16px}
+.instrument-controls label,.instrument-actions label{display:block;margin-bottom:12px}
+.instrument-controls input,.instrument-main select{display:block;width:100%;padding:8px;font-size:14px}
+.instrument-controls h3{font-size:16px;margin:10px 0}
+.instrument-main button{padding:9px 12px;font-size:14px}
+.instrument-main p,.instrument-main figcaption{font-size:14px;color:#b0c1ce}
+.instrument-actions{display:flex;gap:12px;flex-wrap:wrap}
+.instrument-actions label:first-child{flex:1;min-width:200px}
+.instrument-readout{display:grid;grid-template-columns:minmax(200px,360px) minmax(220px,1fr);gap:20px;margin:18px 0}
+.instrument-readout figure{margin:0}
+.instrument-readout canvas{width:100%;height:auto;aspect-ratio:1;background:black;image-rendering:pixelated;border:1px solid #45586c}
+.instrument-readout h2{font-size:18px;margin-top:0}
+.instrument-readout dt{color:#b0c1ce;font-size:14px}
+.instrument-readout dd{margin:2px 0 15px;font:20px 'Space Grotesk',sans-serif;color:#b7e97d}
+.instrument-warning{border-left:3px solid #e9b86f;padding-left:12px}
+.instrument-truth{padding:12px;border:1px dashed #657c93;margin:16px 0}
+@media(max-width:900px){.instrument-grid,.instrument-readout{grid-template-columns:1fr}.instrument-readout figure{max-width:360px}.instrument-main{padding:16px}}

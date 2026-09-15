@@ -1,3 +1,4 @@
+import { createInstrumentWorkspace } from "./instrument-ui.js";
 import { bindWorkspaceLayout } from "./workspace-layout.js";
 import { bindResultsSplitter } from "./results-splitter.js";
 import { createPracticeWorkspace } from "./alignment-practice-ui.js";
@@ -210,6 +211,7 @@ function mount() {
       ["bench", "table", "Bench"],
       ["projects", "folder", "Projects"],
       ["first-experiment", "play", "First lab"],
+      ["instrument-lab", "grid", "Experiment"],
       ["alignment-practice", "target", "Practice"],
       ["templates", "book", "Setups"],
       ["design", "bolt", "Design"],
@@ -1503,6 +1505,9 @@ function handleClick(e) {
     case "alignment-practice":
       practiceWorkspace.open();
       break;
+    case "instrument-lab":
+      instrumentWorkspace.open();
+      break;
     case "first-experiment":
       guidedWorkspace.open();
       break;
@@ -2434,6 +2439,10 @@ const simulationWorkspace = createSimulationWorkspace({
   onImport: (records) => measurementWorkspace.importSimulationRuns(records),
 });
 const practiceWorkspace = createPracticeWorkspace({onBench: p => {checkpoint(); setProject(p);}});
+const instrumentWorkspace = createInstrumentWorkspace({
+  onBench: p => { checkpoint(); setProject(p); },
+  onMeasure: r => measurementWorkspace.openRecord(r),
+});
 const guidedWorkspace = createGuidedWorkspace({
   onBench: p => { checkpoint(); setProject(p); },
   onMeasure: r => measurementWorkspace.openRecord(r),

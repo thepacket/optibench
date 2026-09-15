@@ -59,6 +59,12 @@ export function analyzeRepeats(runs, { verified = false } = {}) {
     throw Error(
       "Multiple saves of the same acquisition are not independent repeats.",
     );
+  const instruments = runs.filter(r => r.simulation?.instrumentLab);
+  if (instruments.length && (instruments.length !== runs.length ||
+      new Set(instruments.map(r => JSON.stringify({project:r.project, camera:r.simulation.camera, roi:r.simulation.roi}))).size !== 1))
+    throw Error("Instrument repeats require unchanged bench, camera and ROI settings.");
+  if (instruments.length && new Set(instruments.flatMap(r => r.simulation.phaseSeeds)).size !== instruments.length * 4)
+    throw Error("Instrument repeats must use independent noise seeds.");
   const base = runs[0].settings;
   for (const r of runs)
     for (const key of new Set([

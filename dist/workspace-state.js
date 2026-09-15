@@ -1,4 +1,5 @@
 const ids = [
+  "instrument-workspace",
   "practice-workspace",
   "guided-workspace",
   "acceptance-workspace",
