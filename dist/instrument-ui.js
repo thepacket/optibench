@@ -23,6 +23,9 @@ function download(name, content, type) {
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 export function createInstrumentWorkspace({
+  getProject,
+  getDetector,
+  onDetector,
   onMeasure,
   onBench,
   store = runStore,
@@ -30,6 +33,7 @@ export function createInstrumentWorkspace({
 } = {}) {
   let root,
     project = validateProject(instrumentSetup()),
+    detectorId = null,
     records = [],
     selected = 0,
     saved = [],
@@ -37,6 +41,16 @@ export function createInstrumentWorkspace({
     message = "",
     truth = false,
     repeat = null;
+  function syncBench() {
+    if (getProject) project = validateProject(getProject());
+    const cameras = project.items.filter(
+      (c) => c.type === "camera" && c.enabled,
+    );
+    const preferred = getDetector?.();
+    if (cameras.some((c) => c.id === preferred)) detectorId = preferred;
+    else if (!cameras.some((c) => c.id === detectorId))
+      detectorId = cameras[0]?.id ?? null;
+  }
   const run =
     acquire ||
     (async (p, config) => {
@@ -58,15 +72,29 @@ export function createInstrumentWorkspace({
       }
     });
   const control = (c, key, label, min, max, step) =>
-    `<label>${label}<input type="number" data-component="${c.id}" data-instrument-field="${key}" value="${c[key] ?? 0}" min="${min}" max="${max}" step="any" required ${busy ? "disabled" : ""}></label>`;
+    c
+      ? `<label>${label}<input type="number" data-component="${c.id}" data-instrument-field="${key}" value="${c[key] ?? 0}" min="${min}" max="${max}" step="any" required ${busy ? "disabled" : ""}></label>`
+      : "";
   function render() {
-    const camera = project.items.find((c) => c.type === "camera"),
-      source = project.items.find((c) => c.type === "source"),
+    const camera = project.items.find(
+        (c) => c.id === detectorId && c.type === "camera" && c.enabled,
+      ),
+      source = project.items.find((c) => c.type === "source" && c.enabled),
       record = records[selected];
     const stale =
-      record && JSON.stringify(record.project) !== JSON.stringify(project);
+      record &&
+      (JSON.stringify(record.project) !== JSON.stringify(project) ||
+        record.simulation.camera.id !== detectorId);
     root.innerHTML = `<header class="measurement-header"><button data-lab="close" ${busy ? "disabled" : ""}>← Optical bench</button><div><span class="measurement-kicker">OPTIBENCH / VIRTUAL INSTRUMENTS</span><h1>Michelson experiment</h1></div><span>Simulated camera measurements</span></header>
-      <main class="instrument-main"><p role="status">${esc(message || "Adjust the experiment, then acquire four phase frames. Readouts come from the camera data.")}</p>
+      <main class="instrument-main"><h2>Live bench · ${esc(project.title)}</h2><p>Instrument edits update the active bench. Captured images retain their original settings and layout.</p><label>Acquisition camera<select data-lab-camera ${busy ? "disabled" : ""}><option value="">Choose an enabled camera</option>${project.items
+        .filter((c) => c.type === "camera" && c.enabled)
+        .map(
+          (c) =>
+            `<option value="${c.id}" ${c.id === detectorId ? "selected" : ""}>${esc(c.label)} · ${esc(c.part)}</option>`,
+        )
+        .join(
+          "",
+        )}</select></label>${!camera ? '<p class="instrument-warning">No camera selected. Add or enable a camera on the bench.</p>' : ""}<p role="status">${esc(message || "Adjust the experiment, then acquire four phase frames. Readouts come from the camera data.")}</p>
       <div class="instrument-grid"><aside class="instrument-controls"><fieldset ${busy ? "disabled" : ""}><legend>Mirror controls</legend>${project.items
         .filter((c) => c.type === "mirror")
         .map(
@@ -76,15 +104,16 @@ export function createInstrumentWorkspace({
         .join(
           "",
         )}<p>Optical piston changes phase, not mount position. Acquisition uses ideal calibrated quarter-cycle reference-arm phase steps.</p></fieldset>
-      <fieldset ${busy ? "disabled" : ""}><legend>Camera & source</legend>${control(camera, "exposure", "Exposure · ms", 0.001, 100000, 0.1)}${control(camera, "gain", "Digital gain", 0.01, 100, 0.1)}${control(source, "power", "Incident laser power · mW", 0.000000001, 100000, 0.000001)}<details><summary>Sensor model assumptions</summary>${control(camera, "qe", "Quantum efficiency · 0–1", 0, 1, 0.01)}${control(camera, "readNoise", "Read noise · electrons RMS", 0, 10000, 0.1)}${control(camera, "darkCurrent", "Dark current · electrons / s", 0, 100000, 0.1)}${control(camera, "fullWell", "Full well · electrons", 1, 10000000, 1)}<p>${camera.bits}-bit ADC · ${camera.pixelPitch} µm pixels. No calibrated vendor response is claimed.</p></details></fieldset>
-      <div class="measurement-buttons"><button data-lab="acquire" ${busy ? "disabled" : ""}>Acquire 4 phase frames</button><button data-lab="repeat" ${busy ? "disabled" : ""}>Acquire 3 repeats</button><button data-lab="bench" ${busy ? "disabled" : ""}>Load this layout on bench</button></div><p>256 × 256 unbinned central sensor pixels. Fixed black/white display scale; exposure changes measured brightness. Repeats use independent noise seeds with unchanged settings.</p></aside>
+      <fieldset ${busy ? "disabled" : ""}><legend>Camera & source</legend>${control(camera, "exposure", "Exposure · ms", 0.001, 100000, 0.1)}${control(camera, "gain", "Digital gain", 0.01, 100, 0.1)}${control(source, "power", "Incident laser power · mW", 0.000000001, 100000, 0.000001)}<details><summary>Sensor model assumptions</summary>${control(camera, "qe", "Quantum efficiency · 0–1", 0, 1, 0.01)}${control(camera, "readNoise", "Read noise · electrons RMS", 0, 10000, 0.1)}${control(camera, "darkCurrent", "Dark current · electrons / s", 0, 100000, 0.1)}${control(camera, "fullWell", "Full well · electrons", 1, 10000000, 1)}<p>${camera?.bits ?? "—"}-bit ADC · ${camera?.pixelPitch ?? "—"} µm pixels. No calibrated vendor response is claimed.</p></details></fieldset>
+      <div class="measurement-buttons"><button data-lab="acquire" ${busy || !camera ? "disabled" : ""}>Acquire 4 phase frames</button><button data-lab="repeat" ${busy || !camera ? "disabled" : ""}>Acquire 3 repeats</button><button data-lab="bench" ${busy ? "disabled" : ""}>Back to optical bench</button></div><p>256 × 256 unbinned central sensor pixels. Fixed black/white display scale; exposure changes measured brightness. Repeats use independent noise seeds with unchanged settings.</p></aside>
       <section class="instrument-results"><div class="instrument-actions"><label>Acquisition<select data-lab-select ${busy || !records.length ? "disabled" : ""}>${records.map((r, i) => `<option value="${i}" ${i === selected ? "selected" : ""}>${i + 1}. ${esc(r.acquiredAt)} · ${r.simulation.camera.exposure} ms</option>`).join("")}</select></label><label>Display phase<select data-lab-phase><option value="0">0°</option><option value="1">90°</option><option value="2">180°</option><option value="3">270°</option></select></label></div>
       ${stale ? '<p class="instrument-warning">Settings changed. This image and its measurements belong to the recorded acquisition; acquire again to observe the change.</p>' : ""}
-      <div class="instrument-readout"><figure><canvas width="256" height="256" aria-label="Acquired camera frame"></canvas><figcaption>Native central ROI · black 0, white ADC full scale</figcaption></figure><div><h2>Measured from captured frames</h2>${record ? `<dl><dt>Mean visibility</dt><dd>${fmt(record.result?.stats.meanVisibility * 100)}%</dd><dt>Valid detector area</dt><dd>${fmt(record.result?.stats.validFraction * 100)}%</dd><dt>Relative OPD RMS / PV</dt><dd>${fmt(record.result?.stats.rmsNm)} / ${fmt(record.result?.stats.pvNm)} nm</dd><dt>Maximum clipped pixels across phase frames</dt><dd>${fmt(Math.max(...record.simulation.saturated) * 100)}%</dd></dl><p>Fitted piston and tilt removed; these values cannot recover absolute mirror displacement.</p>${record.simulation.analysisError ? `<p class="instrument-warning">Reconstruction unavailable: ${esc(record.simulation.analysisError)}</p>` : ""}${record.result?.warnings.map((w) => `<p class="instrument-warning">${esc(w)}</p>`).join("") || ""}` : "<p>No acquisition yet.</p>"}</div></div>
+      <div class="instrument-readout"><figure><canvas width="256" height="256" aria-label="Acquired camera frame"></canvas><figcaption>Native central ROI · black 0, white ADC full scale</figcaption></figure><div><h2>Measured from captured frames</h2>${record ? `<p>Recorded camera: ${esc(record.simulation.camera.label)} · ${record.simulation.camera.exposure} ms · ${esc(record.acquiredAt)}</p>` : ""}${record ? `<dl><dt>Mean visibility</dt><dd>${fmt(record.result?.stats.meanVisibility * 100)}%</dd><dt>Valid detector area</dt><dd>${fmt(record.result?.stats.validFraction * 100)}%</dd><dt>Relative OPD RMS / PV</dt><dd>${fmt(record.result?.stats.rmsNm)} / ${fmt(record.result?.stats.pvNm)} nm</dd><dt>Maximum clipped pixels across phase frames</dt><dd>${fmt(Math.max(...record.simulation.saturated) * 100)}%</dd></dl><p>Fitted piston and tilt removed; these values cannot recover absolute mirror displacement.</p>${record.simulation.analysisError ? `<p class="instrument-warning">Reconstruction unavailable: ${esc(record.simulation.analysisError)}</p>` : ""}${record.result?.warnings.map((w) => `<p class="instrument-warning">${esc(w)}</p>`).join("") || ""}` : "<p>No acquisition yet.</p>"}</div></div>
       <div class="measurement-buttons"><button data-lab="measure" ${!record || busy ? "disabled" : ""}>Open acquisition in Measure</button><button data-lab="save" ${!record || busy ? "disabled" : ""}>Save all acquisitions</button><button data-lab="export" ${!record || busy ? "disabled" : ""}>Export selected run JSON</button><button data-lab="report" ${!record || busy ? "disabled" : ""}>Export measurement report</button></div>
       <label class="measurement-check"><input type="checkbox" data-lab-truth ${truth ? "checked" : ""}>Show simulator truth</label>${truth && record ? `<div class="instrument-truth"><h3>Simulator truth · not measured</h3><p>Path OPD: ${fmt(record.simulation.truth.opdNm)} nm · coherence: ${fmt(record.simulation.truth.coherence)} · predicted fringe period: ${fmt(record.simulation.truth.fringePeriodMm)} mm</p></div>` : ""}
       ${repeat ? `<h3>Three independent simulated acquisitions</h3><p>Relative OPD RMS mean / sample SD: ${fmt(repeat.rms.mean)} / ${fmt(repeat.rms.sd)} nm. PV mean / sample SD: ${fmt(repeat.pv.mean)} / ${fmt(repeat.pv.sd)} nm.</p><p>Noise repeatability under fixed model conditions; no physical uncertainty or drift qualification.</p>` : ""}
-      <section><h3>Resume a saved acquisition</h3><label>Saved instrument runs<select data-lab-saved><option value="">Choose a saved run</option>${saved.map((r) => `<option value="${esc(r.id)}">${esc(r.name)}</option>`).join("")}</select></label><button data-lab="restore" ${busy ? "disabled" : ""}>Restore instrument settings & frames</button><p>Saved runs also appear in Measure. Exported run JSON can be reopened there with its full camera settings and bench snapshot.</p></section></section></div></main>`;
+      <section><h3>Resume a saved acquisition</h3><label>Saved instrument runs<select data-lab-saved><option value="">Choose a saved run</option>${saved.map((r) => `<option value="${esc(r.id)}">${esc(r.name)}</option>`).join("")}</select></label><button data-lab="restore" ${busy ? "disabled" : ""}>Open saved acquisition</button><button data-lab="apply-record" ${busy || !record ? "disabled" : ""}>Apply recorded layout to bench</button><p>Opening saved data does not replace the live bench. Applying its layout is undoable. Saved runs also appear in Measure. Exported run JSON can be reopened there with its full camera settings and bench snapshot.</p></section></section></div></main>`;
+    root.querySelector("[data-lab-camera]").value = detectorId == null ? "" : String(detectorId);
     paint();
   }
   function paint() {
@@ -118,9 +147,20 @@ export function createInstrumentWorkspace({
       restoreId = root.querySelector("[data-lab-saved]")?.value;
     try {
       if (a === "bench") {
-        onBench?.(structuredClone(project));
+        if (!getProject) onBench?.(structuredClone(project));
         closeWorkspace(root);
         return;
+      }
+      if (a === "apply-record") {
+        if (!record) throw Error("Choose an acquisition first.");
+        onBench?.(structuredClone(record.project));
+        project = validateProject(record.project);
+        detectorId = record.simulation.camera.id;
+        onDetector?.(detectorId);
+        syncBench();
+        repeat = null;
+        message =
+          "Recorded layout applied to the bench. Undo is available on the optical bench.";
       }
       if (a === "measure") {
         await onMeasure?.(record);
@@ -137,12 +177,14 @@ export function createInstrumentWorkspace({
           throw Error(
             "This session holds 20 acquisitions. Save or export them, then reopen the app to start a new session.",
           );
+        syncBench();
         busy = true;
         message = "Acquiring camera frames…";
         repeat = null;
         render();
         const batch = [],
-          snapshot = structuredClone(project);
+          snapshot = structuredClone(project),
+          capturedDetector = detectorId;
         for (let i = 0; i < (a === "repeat" ? 3 : 1); i++) {
           const random = new Uint32Array(1);
           crypto.getRandomValues(random);
@@ -154,7 +196,11 @@ export function createInstrumentWorkspace({
             crypto.getRandomValues(random);
             seed = random[0] % 2147483644;
           }
-          const r = await run(snapshot, { seed, n: 256 });
+          const r = await run(snapshot, {
+            seed,
+            n: 256,
+            detectorId: capturedDetector,
+          });
           records.push(r);
           batch.push(r);
           selected = records.length - 1;
@@ -188,7 +234,7 @@ export function createInstrumentWorkspace({
           restored.result = null;
           restored.simulation.analysisError = e.message;
         }
-        project = p;
+        if (!getProject) project = p;
         const existing = records.findIndex((x) => x.id === restored.id);
         if (existing >= 0) {
           records[existing] = restored;
@@ -200,7 +246,7 @@ export function createInstrumentWorkspace({
         repeat = null;
         truth = false;
         message =
-          "Restored recorded frames and instrument settings. Acquire again for a new independent measurement.";
+          "Opened recorded frames and settings. Live controls still describe the active bench; apply the recorded layout explicitly to repeat that setup.";
       }
       if (a === "export")
         download(
@@ -225,6 +271,9 @@ export function createInstrumentWorkspace({
   }
   return {
     async open() {
+      if (busy) return;
+      syncBench();
+      repeat = null;
       if (!root) {
         root = document.createElement("section");
         root.id = "instrument-workspace";
@@ -234,6 +283,14 @@ export function createInstrumentWorkspace({
           if (a) void action(a);
         };
         root.onchange = (e) => {
+          if (busy) return;
+          if (e.target.matches("[data-lab-camera]")) {
+            detectorId = e.target.value ? Number(e.target.value) : null;
+            onDetector?.(detectorId);
+            repeat = null;
+            render();
+            return;
+          }
           if (e.target.matches("[data-lab-phase]")) {
             paint();
             return;
@@ -253,9 +310,13 @@ export function createInstrumentWorkspace({
               message = "Setting is outside its allowed range.";
               return;
             }
+            syncBench();
             project.items.find(
               (c) => c.id === Number(e.target.dataset.component),
             )[e.target.dataset.instrumentField] = Number(e.target.value);
+            onBench?.(structuredClone(project));
+            onDetector?.(detectorId);
+            syncBench();
             repeat = null;
             message = "Settings updated. Acquire again to measure the effect.";
             render();

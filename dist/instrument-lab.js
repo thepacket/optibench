@@ -11,12 +11,17 @@ export function instrumentSetup() {
   return p;
 }
 // A square, unbinned central ROI: one computed sample per physical camera pixel.
-export function acquireInstrument(project, { seed, n = 256 } = {}) {
+export function acquireInstrument(project, { seed, n = 256, detectorId } = {}) {
   if (!Number.isInteger(seed) || seed < 0 || seed > 2147483643)
     throw Error("Invalid acquisition noise seed.");
   if (![64, 128, 256, 512].includes(n)) throw Error("Unsupported camera ROI.");
   const p = validateProject(project);
-  const camera = p.items.find((c) => c.type === "camera" && c.enabled);
+  const camera = p.items.find(
+    (c) =>
+      c.type === "camera" &&
+      c.enabled &&
+      (detectorId == null || c.id === detectorId),
+  );
   if (!camera || camera.pixelsX < n || camera.pixelsY < n)
     throw Error(
       "Choose an enabled camera that can contain the native-pixel ROI.",
@@ -100,6 +105,7 @@ export function acquireInstrument(project, { seed, n = 256 } = {}) {
     result,
     simulation: {
       instrumentLab: true,
+      detectorId: camera.id,
       version: INSTRUMENT_VERSION,
       seed,
       phaseSeeds: [seed, seed + 1, seed + 2, seed + 3],

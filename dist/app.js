@@ -2440,6 +2440,9 @@ const simulationWorkspace = createSimulationWorkspace({
 });
 const practiceWorkspace = createPracticeWorkspace({onBench: p => {checkpoint(); setProject(p);}});
 const instrumentWorkspace = createInstrumentWorkspace({
+  getProject: () => structuredClone(project),
+  getDetector: () => activeDetector,
+  onDetector: id => { activeDetector = id; renderResults(); },
   onBench: p => { checkpoint(); setProject(p); },
   onMeasure: r => measurementWorkspace.openRecord(r),
 });
