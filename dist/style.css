@@ -2893,3 +2893,9 @@ dialog::backdrop {
 }
 @media(min-width:920px){.app-layout[data-inventory-collapsed="true"]>.library{display:none;}}
 @media(min-width:920px) and (max-width:1279px){.app-layout>.library{grid-column:2;grid-row:1;}.app-layout>.workspace{grid-column:3;grid-row:1;}}
+
+/* Keep panel reopen actions discoverable outside the navigation rail. */
+.inventory-toggle { display:inline-flex; flex-shrink:0; padding:6px; font-size:12px; }
+.inventory-toggle span, .inspector-toggle span { display:inline !important; }
+@media(min-width:920px){.app-layout[data-inventory-collapsed="false"] .inventory-toggle{display:none;}}
+.workbar { overflow-x:auto; }
