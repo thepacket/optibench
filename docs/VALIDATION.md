@@ -1,4 +1,4 @@
-# Model validation — OptiBench 0.2.0
+# Model validation — OptiBench 0.3.0
 
 ## Units and conventions
 
@@ -72,3 +72,24 @@ Primary references used include:
 - [Newport spherical lens kits](https://www.newport.com/f/basic-spherical-lens-kits)
 - [Thorlabs optical breadboard geometry](https://www.thorlabs.com/newgrouppage9.cfm?objectgroup_id=7154&pn=B1824F)
 - [Brown University Gaussian propagation notes](https://www.brown.edu/research/labs/mittleman/sites/brown.edu.research.labs.mittleman/files/uploads/lecture21_2.pdf)
+
+## Coherent two-arm interferometry (0.3.0)
+
+The dedicated Interferometry mode adds Michelson and Mach–Zehnder templates. It supports up to two overlapping paths from one TEM00 source in air, with plane mirrors, ideal reciprocal splitters, scalar ND filters, and linear polarization projections. It rejects lenses, aperture elements, M² > 1, multiple independent incident sources, large detector incidence and potentially clipped mirror/splitter beams. This mode is separate from the straight-axis Fourier solver.
+
+Fields include geometric optical path, paraxial Gaussian curvature, accumulated Gouy phase, mirror phase π, and a reciprocal splitter convention t=√T, r=i√R. Mirror piston is a phase-only, positive-path increment of 2d cos(incidence); nanometre translation of physical geometry is neglected. Polarization is a scalar linear-basis approximation; coating-specific s/p phase and vector basis transport are not modeled. Gaussian coherence is explicitly defined as |γ|=exp[−(OPD/Lc)²], with user-entered 1/e coherence length.
+
+The camera uses the existing native-pixel response on a 256² decimated preview. Fringe fitting uses the illuminated central row, divides by the modeled incoherent envelope, and searches spatial frequency by least squares. It reports period, visibility, centre-referenced phase and RMS residual. This is a model-assisted measurement from **simulated data**, not a laboratory acquisition or independent camera calibration. It cannot infer absolute OPD from one wrapped phase. Predicted period includes the local Gaussian curvature gradient at sensor centre. The fit is withheld for clipping, poor residual, low contrast, insufficient cycles or insufficient sampling; a valid fit is not an uncertainty certificate.
+
+A phase scan evaluates 65 equally spaced mirror-piston settings over 2λ of displacement. It records predicted central irradiance and the simulated camera central-pixel signal, with independent reproducible noise per position. The scan does not modify the saved mirror position. CSV exports include the fitted metadata, normalized row, raw row and current scan.
+
+Regression checks establish:
+
+- Michelson bright/dark/bright response at piston 0, λ/4 and λ/2.
+- Energy conservation across both ideal output ports for Michelson and Mach–Zehnder across several piston settings (relative tolerance 2×10⁻⁶).
+- Noiseless sampled-camera fringe-frequency agreement with the independently calculated local phase gradient within 0.3% for both templates.
+- Reproducible camera noise; rejection of saturated, single-arm and unresolved-carrier measurements.
+- The defined 1/e coherence decay, preservation and validation of piston/coherence settings, and explicit failure of unsupported coherent configurations.
+- Application workflow from template selection through piston adjustment, phase scan, undo, solver persistence and switching.
+
+Physical phase and visibility relationships: [UCSB Michelson demonstration](https://web.physics.ucsb.edu/~lecturedemonstrations/Composer/Pages/84%5B1%5D.30a.html). These checks validate the stated ideal model; they do not establish agreement with a calibrated physical instrument.

@@ -2266,3 +2266,39 @@ dialog::backdrop {
     max-height: 29px;
   }
 }
+
+/* Fringe measurement controls remain readable inside the scrollable instrument tray. */
+.interferometry-layout {
+  height: auto;
+  min-height: 100%;
+}
+.interferometry-layout .field-options {
+  flex-wrap: wrap;
+}
+.interferometry-layout .field-options select {
+  max-width: 180px;
+  width: auto;
+}
+.interferometry-layout .field-options,
+.interferometry-layout .field-options select,
+.interferometry-layout .field-options button,
+.interferometry-layout .noise-toggle,
+.interferometry-layout .profile-heading {
+  font-size: 14px;
+}
+.interferometry-layout .profile-section .field-note {
+  font-size: 12px;
+  max-height: none;
+  overflow: visible;
+}
+.interferometry-layout .detector-metrics > div > span {
+  font-size: 12px;
+  line-height: 1.4;
+}
+.interferometry-layout .detector-metrics strong {
+  font-size: 18px;
+  overflow-wrap: anywhere;
+}
+.interferometry-layout .detector-image-wrap {
+  align-self: start;
+}

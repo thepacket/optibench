@@ -89,6 +89,8 @@ export function trace(project, { rays = false } = {}) {
         depth: 0,
         path: [],
         s: 0,
+        phase: 0,
+        piston: 0,
         last: src.id,
         branch: serial++,
         pol: src.polarization || 0,
@@ -139,6 +141,7 @@ export function trace(project, { rays = false } = {}) {
         branch: beam.branch,
         ray: rays,
       });
+      beam.phase -= Math.atan2(q2.re, q2.im) - Math.atan2(beam.q.re, beam.q.im);
       beam.s += len;
       beam.q = q2;
       if (!next) break;
@@ -148,13 +151,25 @@ export function trace(project, { rays = false } = {}) {
         source: beam.source.id,
         position: end,
         distance: beam.s,
+        opticalPath: beam.s + beam.piston,
+        phase: beam.phase,
+        direction: { ...beam.d },
         q: { ...q2 },
         radius: w,
         power: beam.power,
         offset: next.offset,
         incidence: next.incidence,
         branch: beam.branch,
-        path: [...beam.path, { id: c.id, distance: len, offset: next.offset }],
+        path: [
+          ...beam.path,
+          {
+            id: c.id,
+            distance: len,
+            offset: next.offset,
+            incidence: next.incidence,
+            radius: w,
+          },
+        ],
         polarization: beam.pol,
         wavelength: beam.source.wavelength,
         m2: beam.source.m2,
@@ -236,10 +251,14 @@ export function trace(project, { rays = false } = {}) {
       }
       if (c.type === "filter") beam.power *= c.transmission;
       if (c.type === "polarizer") {
+        if (Math.cos((beam.pol - c.axis) * DEG) < 0) beam.phase += Math.PI;
         beam.power *= Math.cos((beam.pol - c.axis) * DEG) ** 2;
         beam.pol = c.axis;
       }
       if (c.type === "mirror") {
+        beam.phase += Math.PI;
+        beam.piston +=
+          2 * (c.pistonNm || 0) * 1e-6 * Math.abs(dot(beam.d, next.n));
         beam.d = reflection(beam.d, next.n);
         beam.power *= c.reflectivity;
       }
@@ -250,6 +269,7 @@ export function trace(project, { rays = false } = {}) {
             p: { ...end },
             d: reflection(beam.d, next.n),
             power: beam.power * c.reflectivity,
+            phase: beam.phase + Math.PI / 2,
             last: c.id,
             depth: beam.depth + 1,
             branch: serial++,

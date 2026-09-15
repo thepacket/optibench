@@ -18,6 +18,7 @@ Open the local server at `http://localhost:5173`. Runtime code has no npm depend
 - 291 inventory entries: 154 sourced manufacturer references and 137 parametric design entries. Manufacturer families include Thorlabs, Edmund Optics and Newport. Source links, lookup date, legacy status and assumptions travel with the catalog.
 - Metric or imperial optical-table hole patterns, arbitrary X/Y placement, optical-normal rotation, adjustable mounting envelopes, hole-center or incremental snapping, locking, multiple selection, pan, zoom, rulers and numerical placement.
 - Two-dimensional intersection and reflection, beamsplitter branches, finite-aperture ray clipping, ideal thin lenses, polarizers, neutral-density filters, screens, power meters and camera planes.
+- Coherent Michelson and Mach–Zehnder experiments: two-arm field summation, mirror piston, finite coherence, simulated camera fringe fits, phase scans and measurement CSV. Open **Setups → Michelson interferometer**. See the validation document for the supported ideal model.
 - Complex-q Gaussian propagation and a separate 13-ray geometric trace.
 - Numerical scalar Fourier propagation with a 2D FFT angular-spectrum operator, thin-lens phase, apertures, slits, coherent image inputs and sampling diagnostics; 128² through 1024² grids.
 - A configurable native-pixel camera-response model including QE, exposure, photon/dark shot noise, read noise, full-well clipping, digital gain and ADC quantization. Preview is decimated and camera calibration parameters are explicitly assumed.

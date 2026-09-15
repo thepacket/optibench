@@ -1,5 +1,5 @@
 import { catalog, instantiate } from "./catalog.js";
-export const ENGINE_VERSION = "0.2.0";
+export const ENGINE_VERSION = "0.3.0";
 export const DEFAULT_TABLE = {
   width: 1500,
   height: 900,
@@ -16,6 +16,11 @@ export function makeProject(template = "expander") {
     version: 2,
     engine: ENGINE_VERSION,
     title: "Beam expansion & power monitoring",
+    solver: ["michelson", "mach-zehnder"].includes(template)
+      ? "Interferometry"
+      : ["relay", "diffraction"].includes(template)
+        ? "Fourier"
+        : "Gaussian",
     notes: "",
     table: { ...DEFAULT_TABLE },
     items: [],
@@ -106,12 +111,83 @@ export function makeProject(template = "expander") {
     add("DESIGN-POL-45", 800, 450, { label: "P2 · Analyzer" });
     add("DESIGN-POWER", 1150, 450, { label: "D1 · Transmitted power" });
   }
+  if (["michelson", "mach-zehnder"].includes(template)) {
+    p.title =
+      template === "michelson"
+        ? "Michelson · fringe metrology"
+        : "Mach–Zehnder · two-port interference";
+    add("DESIGN-LASER-633", 200, 450, {
+      waist: 1.5,
+      power: 0.00001,
+      coherenceLength: 1000,
+      label: "L1 · Coherent 633 nm",
+    });
+    if (template === "michelson") {
+      add("DESIGN-BS-50", 650, 450, {
+        angle: 45,
+        label: "BS1 · Split / recombine",
+      });
+      add("DESIGN-MIRROR-25.4", 1050, 450, {
+        angle: 0.015,
+        reflectivity: 1,
+        pistonNm: 0,
+        label: "M1 · Tilt + piston",
+      });
+      add("DESIGN-MIRROR-25.4", 650, 50, {
+        angle: 90,
+        reflectivity: 1,
+        label: "M2 · Reference arm",
+      });
+      add("DESIGN-CAMERA", 650, 800, {
+        angle: 90,
+        exposure: 100,
+        label: "D1 · Fringe camera",
+      });
+      add("DESIGN-POWER", 100, 450, { label: "D2 · Return port" });
+    } else {
+      add("DESIGN-BS-50", 450, 450, {
+        angle: 135,
+        label: "BS1 · Input splitter",
+      });
+      add("DESIGN-MIRROR-25.4", 950, 450, {
+        angle: 135.015,
+        reflectivity: 1,
+        label: "M1 · Tilt + piston",
+      });
+      add("DESIGN-MIRROR-25.4", 450, 750, {
+        angle: 135,
+        reflectivity: 1,
+        label: "M2 · Reference arm",
+      });
+      add("DESIGN-BS-50", 950, 750, { angle: 135, label: "BS2 · Recombiner" });
+      add("DESIGN-CAMERA", 1250, 750, {
+        exposure: 100,
+        label: "D1 · Fringe camera",
+      });
+      add("DESIGN-POWER", 950, 850, {
+        angle: 90,
+        label: "D2 · Complementary port",
+      });
+    }
+  }
   if (template === "empty") {
     p.title = "Untitled experiment";
   }
   return p;
 }
 export const templates = [
+  [
+    "michelson",
+    "Michelson interferometer",
+    "Two return arms, nanometre piston and sampled fringe metrology.",
+    "Interferometry",
+  ],
+  [
+    "mach-zehnder",
+    "Mach–Zehnder interferometer",
+    "Two splitters, independent arms and complementary outputs.",
+    "Interferometry",
+  ],
   [
     "expander",
     "Beam expansion",
@@ -264,6 +340,12 @@ export function validateProject(input) {
         out.wavelength = number(c.wavelength, 200, 20000, "wavelength");
         out.waist = number(c.waist, 0.001, 100, "waist");
         out.power = number(c.power, 1e-12, 1e6, "power");
+        out.coherenceLength = number(
+          c.coherenceLength ?? 1000,
+          0.000001,
+          1e9,
+          "coherence length",
+        );
         out.m2 = number(c.m2 ?? 1, 1, 100, "M²");
         out.polarization = number(
           c.polarization ?? 0,
@@ -282,6 +364,8 @@ export function validateProject(input) {
         out.transmission + out.reflectivity > 1.000001
       )
         throw Error("Beamsplitter R + T cannot exceed 100%.");
+      if (c.type === "mirror")
+        out.pistonNm = number(c.pistonNm ?? 0, -1e6, 1e6, "mirror piston");
       if (c.type === "polarizer")
         out.axis = number(c.axis ?? 0, -360, 360, "polarizer axis");
       if (c.type === "screen") out.terminate = c.terminate !== false;
@@ -308,18 +392,16 @@ export function validateProject(input) {
       return out;
     });
   const measurements = Array.isArray(input.measurements)
-    ? input.measurements
-        .slice(0, 100)
-        .map((m) => ({
-          a: {
-            x: number(m.a.x, 0, table.width, "ruler X"),
-            y: number(m.a.y, 0, table.height, "ruler Y"),
-          },
-          b: {
-            x: number(m.b.x, 0, table.width, "ruler X"),
-            y: number(m.b.y, 0, table.height, "ruler Y"),
-          },
-        }))
+    ? input.measurements.slice(0, 100).map((m) => ({
+        a: {
+          x: number(m.a.x, 0, table.width, "ruler X"),
+          y: number(m.a.y, 0, table.height, "ruler Y"),
+        },
+        b: {
+          x: number(m.b.x, 0, table.width, "ruler X"),
+          y: number(m.b.y, 0, table.height, "ruler Y"),
+        },
+      }))
     : [];
   let image = null;
   if (input.image) {
@@ -343,6 +425,11 @@ export function validateProject(input) {
   return {
     version: 2,
     engine: ENGINE_VERSION,
+    solver: ["Gaussian", "Rays", "Fourier", "Interferometry"].includes(
+      input.solver,
+    )
+      ? input.solver
+      : "Gaussian",
     title: text(input.title, 100) || "Untitled experiment",
     notes: text(input.notes, 10000),
     table,

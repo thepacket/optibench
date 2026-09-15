@@ -16,6 +16,7 @@ import {
   monteCarlo,
   designExpander,
 } from "./optics.js";
+import { coherentField, measureFringes, phaseScan } from "./interferometry.js";
 import { cameraResponse } from "./wave.js";
 import { icon, typeIcon } from "./icons.js";
 const $ = (s) => document.querySelector(s),
@@ -47,8 +48,10 @@ try {
     "The saved draft could not be restored. Your project file can still be opened.";
 }
 let activeBranch = null;
+let fringeCache = null,
+  fringeScan = null;
 let selected = new Set([project.items[1]?.id].filter(Boolean)),
-  mode = "Gaussian",
+  mode = project.solver || "Gaussian",
   running = true,
   tool = "select",
   query = "",
@@ -192,7 +195,7 @@ function mount() {
       .map(([a, i, t]) => button(a, t, i, a === "bench" ? "active" : ""))
       .join(
         "",
-      )}<div class="rail-spacer"></div>${button("table", "Table", "settings")}${button("guide", "Guide", "info")}</nav><aside class="library panel" id="library-panel"><div class="panel-title"><h2>Component inventory</h2>${iconButton("close-drawer", "Close inventory", "close", "drawer-close")}</div><div class="inventory-summary"><strong>${catalog.length}</strong> entries <span>·</span> <strong>${catalog.filter((c) => c.provenance !== "ideal").length}</strong> manufacturer references</div><label class="searchbox">${icon("search")}<input id="search" aria-label="Search inventory" placeholder="Part number or component…" value="${esc(query)}"><kbd>⌘K</kbd></label><div class="library-filters"><select id="category" aria-label="Component category">${categories.map((c) => `<option ${category === c ? "selected" : ""}>${c}</option>`).join("")}</select><select id="brand" aria-label="Manufacturer">${["All manufacturers", "Thorlabs", "Edmund Optics", "Newport", "OptiBench", "Custom"].map((c) => `<option ${brand === c ? "selected" : ""}>${c}</option>`).join("")}</select><select id="scope" aria-label="Catalog provenance">${["All entries", "Manufacturer references", "Ideal designs"].map((c) => `<option ${scope === c ? "selected" : ""}>${c}</option>`).join("")}</select></div><div class="inventory-sort"><span id="catalog-count"></span><select id="sort" aria-label="Sort inventory"><option value="recommended">Recommended</option><option value="focal">Focal length ↑</option><option value="diameter">Diameter ↑</option><option value="part">Part number</option></select></div><div id="catalog-list" class="catalog-list"></div><div class="library-footer">${button("custom", "Custom component", "plus")}${button("compare", "Compare (0)", "parts", "", 'id="compare-button"')}${button("import-catalog", "Import catalog JSON", "folder")}</div></aside><main class="workspace"><div class="workspace-heading"><div><p class="eyebrow">OPTICAL DESIGN WORKSPACE</p><h1 id="project-title">${esc(project.title)}</h1></div><div class="workspace-actions">${iconButton("undo", "Undo · Ctrl/Cmd Z", "undo")}${iconButton("redo", "Redo · Ctrl/Cmd Shift Z", "redo")}<span class="separator"></span>${button("run", "Pause", "pause", "accent", 'id="run-button"')}</div></div><div class="workbar"><div class="tools" role="group" aria-label="Table tools">${iconButton("tool-select", "Select & move · V", "cursor", "active")}${iconButton("tool-pan", "Pan table · H / middle-drag", "hand")}${iconButton("tool-measure", "Measure distance · M", "ruler")}<span class="separator"></span>${iconButton("fit", "Fit entire table · F", "fit")}${iconButton("grid", "Toggle mounting holes", "grid", "active")}</div><div class="mode-controls"><select id="mode" aria-label="Physics engine"><option>Gaussian</option><option>Rays</option><option>Fourier</option></select><span class="mode-indicator" id="mode-indicator">ABCD + 2D PATH</span></div>${button("inspect", "Inspector", "settings", "compact inspector-toggle")}</div><div class="bench-stage" id="stage"><svg id="bench" xmlns="http://www.w3.org/2000/svg" aria-label="Laboratory optical table" tabindex="0"></svg><div class="canvas-top"><span id="table-label"></span><span id="coordinate-readout">X — &nbsp; Y — mm</span></div><div class="canvas-bottom"><div class="view-options"><label><input type="checkbox" id="envelope" checked>Envelope</label><label><input type="checkbox" id="labels" checked>Labels</label><button data-action="table">Table settings</button></div><div class="zoom-control">${button("zoom-out", "−")}<span id="zoom-readout">100%</span>${button("zoom-in", "+")}${iconButton("fit", "Fit table", "fit")}</div></div><div id="placement-hint" class="placement-hint" hidden></div></div><section class="results-panel" id="results-panel"><div class="results-heading"><div class="result-tabs">${[
+      )}<div class="rail-spacer"></div>${button("table", "Table", "settings")}${button("guide", "Guide", "info")}</nav><aside class="library panel" id="library-panel"><div class="panel-title"><h2>Component inventory</h2>${iconButton("close-drawer", "Close inventory", "close", "drawer-close")}</div><div class="inventory-summary"><strong>${catalog.length}</strong> entries <span>·</span> <strong>${catalog.filter((c) => c.provenance !== "ideal").length}</strong> manufacturer references</div><label class="searchbox">${icon("search")}<input id="search" aria-label="Search inventory" placeholder="Part number or component…" value="${esc(query)}"><kbd>⌘K</kbd></label><div class="library-filters"><select id="category" aria-label="Component category">${categories.map((c) => `<option ${category === c ? "selected" : ""}>${c}</option>`).join("")}</select><select id="brand" aria-label="Manufacturer">${["All manufacturers", "Thorlabs", "Edmund Optics", "Newport", "OptiBench", "Custom"].map((c) => `<option ${brand === c ? "selected" : ""}>${c}</option>`).join("")}</select><select id="scope" aria-label="Catalog provenance">${["All entries", "Manufacturer references", "Ideal designs"].map((c) => `<option ${scope === c ? "selected" : ""}>${c}</option>`).join("")}</select></div><div class="inventory-sort"><span id="catalog-count"></span><select id="sort" aria-label="Sort inventory"><option value="recommended">Recommended</option><option value="focal">Focal length ↑</option><option value="diameter">Diameter ↑</option><option value="part">Part number</option></select></div><div id="catalog-list" class="catalog-list"></div><div class="library-footer">${button("custom", "Custom component", "plus")}${button("compare", "Compare (0)", "parts", "", 'id="compare-button"')}${button("import-catalog", "Import catalog JSON", "folder")}</div></aside><main class="workspace"><div class="workspace-heading"><div><p class="eyebrow">OPTICAL DESIGN WORKSPACE</p><h1 id="project-title">${esc(project.title)}</h1></div><div class="workspace-actions">${iconButton("undo", "Undo · Ctrl/Cmd Z", "undo")}${iconButton("redo", "Redo · Ctrl/Cmd Shift Z", "redo")}<span class="separator"></span>${button("run", "Pause", "pause", "accent", 'id="run-button"')}</div></div><div class="workbar"><div class="tools" role="group" aria-label="Table tools">${iconButton("tool-select", "Select & move · V", "cursor", "active")}${iconButton("tool-pan", "Pan table · H / middle-drag", "hand")}${iconButton("tool-measure", "Measure distance · M", "ruler")}<span class="separator"></span>${iconButton("fit", "Fit entire table · F", "fit")}${iconButton("grid", "Toggle mounting holes", "grid", "active")}</div><div class="mode-controls"><select id="mode" aria-label="Physics engine"><option>Gaussian</option><option>Rays</option><option>Fourier</option><option>Interferometry</option></select><span class="mode-indicator" id="mode-indicator">ABCD + 2D PATH</span></div>${button("inspect", "Inspector", "settings", "compact inspector-toggle")}</div><div class="bench-stage" id="stage"><svg id="bench" xmlns="http://www.w3.org/2000/svg" aria-label="Laboratory optical table" tabindex="0"></svg><div class="canvas-top"><span id="table-label"></span><span id="coordinate-readout">X — &nbsp; Y — mm</span></div><div class="canvas-bottom"><div class="view-options"><label><input type="checkbox" id="envelope" checked>Envelope</label><label><input type="checkbox" id="labels" checked>Labels</label><button data-action="table">Table settings</button></div><div class="zoom-control">${button("zoom-out", "−")}<span id="zoom-readout">100%</span>${button("zoom-in", "+")}${iconButton("fit", "Fit table", "fit")}</div></div><div id="placement-hint" class="placement-hint" hidden></div></div><section class="results-panel" id="results-panel"><div class="results-heading"><div class="result-tabs">${[
       ["detector", "Detector"],
       ["envelope", "Propagation"],
       ["paths", "Optical path"],
@@ -281,7 +284,9 @@ function renderStatus() {
         : "ANGULAR SPECTRUM"
       : mode === "Rays"
         ? "2D PARAXIAL RAYS"
-        : "ABCD + 2D PATH";
+        : mode === "Interferometry"
+          ? "COHERENT TWO-ARM"
+          : "ABCD + 2D PATH";
   $("#check-count").textContent = warnings.length ? " " + warnings.length : "";
   $("#table-label").textContent =
     `${project.table.width} × ${project.table.height} mm · ${project.table.thread} / ${project.table.pitch} mm`;
@@ -454,6 +459,12 @@ function renderInspector() {
         min: -360,
         max: 360,
       }) +
+      inputField(
+        "Coherence length · 1/e",
+        "coherenceLength",
+        c.coherenceLength ?? 1000,
+        { unit: "mm", min: 0.000001, max: 1e9 },
+      ) +
       (c.type === "image"
         ? `<label class="field"><span>Field at source plane</span><select data-field="pattern">${[
             ["bars", "Resolution bars"],
@@ -486,6 +497,13 @@ function renderInspector() {
       "reflectivity",
       c.reflectivity,
       { min: 0, max: 1, unit: "0–1" },
+    );
+  if (c.type === "mirror")
+    optical += inputField(
+      "Normal piston · phase only",
+      "pistonNm",
+      c.pistonNm ?? 0,
+      { unit: "nm", min: -1e6, max: 1e6, step: 1 },
     );
   if (["filter", "splitter"].includes(c.type))
     optical += inputField(
@@ -619,6 +637,7 @@ function renderResults() {
       '<div class="empty-state">Place a screen, camera or power meter to inspect a detector plane.</div>';
     return;
   }
+  if (mode === "Interferometry") return renderInterferometry(body, det);
   let wave = mode === "Fourier",
     field = wave
       ? waveResult
@@ -653,6 +672,84 @@ function renderResults() {
       paintField(display);
       plotProfile(display);
     }
+  }
+}
+function getFringes(det) {
+  const key = snapshot() + det.id + noise;
+  if (fringeCache?.key === key) return fringeCache;
+  const field = coherentField(project, det.id);
+  fringeCache = { key, field, measured: measureFringes(field, { noise }) };
+  return fringeCache;
+}
+function renderInterferometry(body, det) {
+  if (!running) {
+    body.innerHTML =
+      '<div class="empty-state">Interferometry paused. Resume to calculate the current setup.</div>';
+    return;
+  }
+  try {
+    const { field: f, measured: m, key } = getFringes(det),
+      fit = m.fit;
+    const mirrors = project.items.filter(
+      (c) => c.type === "mirror" && c.enabled,
+    );
+    const scan = fringeScan?.key === key ? fringeScan.rows : null;
+    body.innerHTML = `<div class="detector-layout interferometry-layout"><div class="detector-image-wrap"><canvas id="detector-canvas" aria-label="Coherently recombined simulated fringes"></canvas><span class="image-caption">${det.type === "camera" ? "SIMULATED CAMERA" : "COHERENT IRRADIANCE"}</span></div><div class="profile-section"><div class="profile-heading"><strong>${scan ? "Mirror piston scan · central pixel" : "Fringe profile · central sensor row"}</strong><span>${f.paths.length} paths</span></div><svg id="profile-plot" viewBox="0 0 340 110"></svg><div class="field-options"><label>Scan mirror<select id="scan-mirror">${mirrors.map((c) => `<option value="${c.id}" ${fringeScan?.mirrorId === c.id ? "selected" : ""}>${esc(c.label)}</option>`).join("")}</select></label>${button("phase-scan", "Scan 2λ", "play", "outline")}${button("fringe-export", "CSV", "download", "outline")}</div>${det.type === "camera" ? `<label class="noise-toggle"><input id="noise" type="checkbox" ${noise ? "checked" : ""}>Shot + read noise · reproducible</label>` : ""}<p class="field-note" id="fringe-quality">${esc(m.reason || `Valid row fit · RMS residual ${fmt(Math.sqrt(fit.mse), 4)} · ${m.samples.length} illuminated samples`)} ${fmt(m.saturated * 100, 2)}% clipped.</p><p class="field-note">Model-normalized simulated data. Phase origin: sensor centre. Adjust arm mirror angle for fringe spacing; piston for phase. ${scan ? "Scan covers 65 positions; CSV includes the full scan." : ""}</p></div><div class="detector-metrics"><div><span>Measured fringe period</span><strong>${fmt(fit?.period, 4)} <small>mm</small></strong></div><div><span>Measured visibility / phase</span><strong>${fit ? fmt(fit.visibility * 100, 1) + "% / " + fmt(fit.phase, 3) : "—"} <small>rad</small></strong></div><div><span>Predicted OPD · path 2 − 1</span><strong>${fmt(f.opd === null ? null : f.opd * 1e6, 2)} <small>nm</small></strong></div><div><span>Predicted coherence / period</span><strong>${fmt(f.coherence * 100, 1)}% / ${f.carrier > 0 ? fmt(1 / f.carrier, 4) : "∞"} <small>mm</small></strong></div></div></div>`;
+    paintField(m, det.type === "camera");
+    if (scan) {
+      const max = Math.max(...scan.map((r) => r.signal), 1e-30);
+      $("#profile-plot").innerHTML =
+        `<path d="${scan.map((r, i) => `${i ? "L" : "M"}${15 + (i / 64) * 310} ${85 - (r.signal / max) * 70}`).join(" ")}" stroke="#bbef84" fill="none" stroke-width="1.6"/><text x="15" y="107" fill="#9caaba" font-size="11">${fmt(scan[0].piston, 1)} nm</text><text x="250" y="107" fill="#9caaba" font-size="11">${fmt(scan.at(-1).piston, 1)} nm</text>`;
+    } else plotProfile(m);
+  } catch (error) {
+    body.innerHTML = `<div class="empty-state error">${esc(error.message)}<p>Use Setups → Michelson or Mach–Zehnder to start an aligned experiment.</p></div>`;
+  }
+}
+function exportFringes() {
+  try {
+    const det = project.items.find((c) => c.id === activeDetector),
+      { field: f, measured: m, key } = getFringes(det);
+    const rows = [
+      ["OptiBench simulated fringe measurement", ENGINE_VERSION],
+      ["detector", det.label],
+      ["wavelength_nm", f.wavelength],
+      ["noise", noise],
+      ["measurement_status", m.reason || "valid"],
+      ["opd_nm", f.opd === null ? "" : f.opd * 1e6],
+      ["fit_period_mm", m.fit?.period ?? ""],
+      ["fit_visibility", m.fit?.visibility ?? ""],
+      ["fit_phase_rad", m.fit?.phase ?? ""],
+      ["fit_rms", m.fit ? Math.sqrt(m.fit.mse) : ""],
+      ["predicted_coherence", f.coherence],
+      ["sensor_clipped_fraction", m.saturated],
+      [],
+      ["x_mm", "envelope_normalized_signal"],
+      ...m.samples.map((p) => [p.x, p.y]),
+      [],
+      [
+        "sample_x_mm",
+        det.type === "camera" ? "adc_fraction" : "sample_power_mw",
+      ],
+      ...Array.from({ length: m.n }, (_, i) => [
+        ((i + 0.5) / m.n - 0.5) * m.width,
+        m.values[Math.floor(m.n / 2) * m.n + i],
+      ]),
+    ];
+    if (fringeScan?.key === key)
+      rows.push(
+        [],
+        ["mirror_id", fringeScan.mirrorId],
+        [
+          "piston_nm",
+          "predicted_irradiance_mw_mm2",
+          "simulated_central_signal",
+        ],
+        ...fringeScan.rows.map((r) => [r.piston, r.irradiance, r.signal]),
+      );
+    download("optibench-interferometry.csv", csv(rows), "text/csv");
+    notify("Fringe data and current phase scan exported.");
+  } catch (error) {
+    notify(error.message);
   }
 }
 function paintField(field, camera = false) {
@@ -793,6 +890,7 @@ function modal(title, body, wide = false) {
 }
 function setProject(p) {
   project = validateProject(p);
+  mode = project.solver;
   selected.clear();
   activeDetector = null;
   waveResult = null;
@@ -1287,9 +1385,29 @@ function handleClick(e) {
       checkpoint();
       mode = ["relay", "diffraction"].includes(b.dataset.template)
         ? "Fourier"
-        : "Gaussian";
+        : ["michelson", "mach-zehnder"].includes(b.dataset.template)
+          ? "Interferometry"
+          : "Gaussian";
+      showResults = true;
+      resultTab = "detector";
       closeDialog();
       setProject(makeProject(b.dataset.template));
+      break;
+    case "phase-scan":
+      try {
+        const mirrorId = +$("#scan-mirror").value;
+        fringeScan = {
+          key: snapshot() + activeDetector + noise,
+          rows: phaseScan(project, activeDetector, mirrorId, { noise }),
+          mirrorId,
+        };
+        renderResults();
+      } catch (error) {
+        notify(error.message);
+      }
+      break;
+    case "fringe-export":
+      exportFringes();
       break;
     case "guide":
       guideDialog();
@@ -1526,6 +1644,8 @@ function handleChange(e) {
   }
   if (el.id === "mode") {
     mode = el.value;
+    project.solver = mode;
+    saveLocal();
     waveResult = null;
     compute(true);
     if (mode === "Fourier") scheduleWave();
@@ -1725,6 +1845,7 @@ function exportSvg() {
   );
 }
 function exportResults() {
+  if (mode === "Interferometry") return exportFringes();
   const rows = [
     [
       "component_id",
@@ -1974,7 +2095,7 @@ async function handleSubmit(e) {
 function guideDialog() {
   modal(
     "Model reference & laboratory workflow",
-    `<div class="guide"><section><h3>Laboratory table</h3><p>All positions and footprints are in millimetres. X increases to the right and Y down the screen. Angles specify the surface normal; a source angle specifies its direction. A mirror normal of 135° turns a rightward beam downward. Hole patterns support M6 on 25 mm centers or ¼″–20 on 25.4 mm centers.</p><p>Click + in the inventory, then click the table to place a component. You can also drag inventory cards onto it. Drag parts, Shift-click to select several, and edit coordinates precisely. Middle-drag or H pans; the wheel zooms around the pointer. M measures between two points. V selects. F fits the table. R rotates 15°. Arrow keys move by one snap interval, Shift by ten. Ctrl/Cmd-Z undoes; Ctrl/Cmd-Shift-Z redoes.</p></section><section><h3>Gaussian model</h3><p>Complex q propagation in air: q′ = q + d, and q′ = q / (1 − q/f) at an ideal thin lens. Beam radius follows w² = M²λ|q|²/(π Im q). The initial source plane is a beam waist. Each surface is located by a two-dimensional intersection test. Plane mirrors reflect the propagation direction; splitters create separate power branches; polarizers apply Malus’ law.</p><p>Clear-aperture clipping uses a centered Gaussian estimate. Truncation, decenter, large lens incidence and catalog coating mismatches generate design checks. Lens incidence beyond 10° stops that path. Interfering branches are not coherently recombined by this solver. Source beams are traced independently.</p><a class="source-link" href="https://www.brown.edu/research/labs/mittleman/sites/brown.edu.research.labs.mittleman/files/uploads/lecture21_2.pdf" target="_blank" rel="noopener">Gaussian propagation reference ↗</a></section><section><h3>Ray model</h3><p>Thirteen paraxial rays per source are traced in the table plane. Rays refract through thin lenses, reflect, split, or stop at apertures and detectors. The detector’s Gaussian cross-section remains a separate ABCD reference; a ray bundle is not a wave-optical PSF.</p></section><section><h3>Fourier model</h3><p>A 128², 256², 512² or 1024² scalar complex field is propagated using a two-dimensional FFT angular-spectrum operator. Thin-lens phase, circular apertures, slits, neutral-density transmission and linear polarizers operate on the sampled field. Uploaded image intensity becomes field amplitude via a square root. Only one coherent M² = 1 source and straight, parallel optical planes are supported. Folded or split wave paths fail explicitly.</p><p>The finite FFT grid is periodic. Warnings report significant edge energy and undersampled lens phase; choose field width and resolution carefully and check convergence. Reported D4σ widths are second-moment widths. The solver does not include vector electromagnetic fields, surface prescriptions, dispersion, nonlinear optics, grating orders or thick-lens aberrations.</p></section><section><h3>Camera model</h3><p>Native-pixel photoelectrons are computed from incident irradiance, pixel area, exposure, wavelength and QE. Optional Poisson photon/dark noise and Gaussian read noise precede full-well clipping, digital gain and ADC quantization. The displayed image samples this model onto a reduced preview grid; it is not a full-resolution readout. Catalog camera dimensions are sourced; QE, read noise, dark current, full well and gain are editable assumptions.</p></section><section><h3>Catalog provenance & project files</h3><p>Every manufacturer reference links to its source. Some are archived specifications. No live stock, price or measured coating feed is connected. Ideal and custom components are explicitly identified. Changing a catalog parameter is shown as a model override. A parts list is a starting point for procurement, not a verified assembly.</p><p>Projects autosave in this browser and can be exported as versioned JSON including source images. Keep downloaded backups for long-term retention. The app imports the earlier OptiBench project format. Table drawings export as SVG; bill of materials, optical path and tolerance samples export as CSV.</p></section></div>`,
+    `<div class="guide"><section><h3>Laboratory table</h3><p>All positions and footprints are in millimetres. X increases to the right and Y down the screen. Angles specify the surface normal; a source angle specifies its direction. A mirror normal of 135° turns a rightward beam downward. Hole patterns support M6 on 25 mm centers or ¼″–20 on 25.4 mm centers.</p><p>Click + in the inventory, then click the table to place a component. You can also drag inventory cards onto it. Drag parts, Shift-click to select several, and edit coordinates precisely. Middle-drag or H pans; the wheel zooms around the pointer. M measures between two points. V selects. F fits the table. R rotates 15°. Arrow keys move by one snap interval, Shift by ten. Ctrl/Cmd-Z undoes; Ctrl/Cmd-Shift-Z redoes.</p></section><section><h3>Gaussian model</h3><p>Complex q propagation in air: q′ = q + d, and q′ = q / (1 − q/f) at an ideal thin lens. Beam radius follows w² = M²λ|q|²/(π Im q). The initial source plane is a beam waist. Each surface is located by a two-dimensional intersection test. Plane mirrors reflect the propagation direction; splitters create separate power branches; polarizers apply Malus’ law.</p><p>Clear-aperture clipping uses a centered Gaussian estimate. Truncation, decenter, large lens incidence and catalog coating mismatches generate design checks. Lens incidence beyond 10° stops that path. Interfering branches are not coherently recombined by this solver. Source beams are traced independently.</p><a class="source-link" href="https://www.brown.edu/research/labs/mittleman/sites/brown.edu.research.labs.mittleman/files/uploads/lecture21_2.pdf" target="_blank" rel="noopener">Gaussian propagation reference ↗</a></section><section><h3>Interferometry</h3><p>Open a Michelson or Mach–Zehnder setup. This mode coherently combines up to two TEM00 paths from one laser. Plane mirrors, ideal reciprocal splitters (r = i√R, t = √T), ND filters and linear polarizers are supported. The model includes geometric path, Gaussian curvature, Gouy phase, mirror piston and Gaussian temporal coherence exp[−(OPD/Lc)²]. Piston changes phase by 4πd cos(incidence)/λ; it does not translate the mount.</p><p>The central-row fit estimates spatial frequency, visibility and phase from sampled simulated data after normalization by the modeled noninterfering envelope. The phase is relative to sensor x = 0 and cannot alone determine absolute path difference. Scan records the central pixel while moving one mirror through 2λ of piston. Camera noise and ADC settings apply. These are simulated measurements, not acquired laboratory frames. Lenses, clipped diffraction, coating-specific phase, vector polarization transport and environmental drift are outside this coherent folded-path model.</p><a class="source-link" href="https://web.physics.ucsb.edu/~lecturedemonstrations/Composer/Pages/84%5B1%5D.30a.html" target="_blank" rel="noopener">Michelson phase and visibility reference ↗</a></section><section><h3>Ray model</h3><p>Thirteen paraxial rays per source are traced in the table plane. Rays refract through thin lenses, reflect, split, or stop at apertures and detectors. The detector’s Gaussian cross-section remains a separate ABCD reference; a ray bundle is not a wave-optical PSF.</p></section><section><h3>Fourier model</h3><p>A 128², 256², 512² or 1024² scalar complex field is propagated using a two-dimensional FFT angular-spectrum operator. Thin-lens phase, circular apertures, slits, neutral-density transmission and linear polarizers operate on the sampled field. Uploaded image intensity becomes field amplitude via a square root. Only one coherent M² = 1 source and straight, parallel optical planes are supported. Folded or split wave paths fail explicitly.</p><p>The finite FFT grid is periodic. Warnings report significant edge energy and undersampled lens phase; choose field width and resolution carefully and check convergence. Reported D4σ widths are second-moment widths. The solver does not include vector electromagnetic fields, surface prescriptions, dispersion, nonlinear optics, grating orders or thick-lens aberrations.</p></section><section><h3>Camera model</h3><p>Native-pixel photoelectrons are computed from incident irradiance, pixel area, exposure, wavelength and QE. Optional Poisson photon/dark noise and Gaussian read noise precede full-well clipping, digital gain and ADC quantization. The displayed image samples this model onto a reduced preview grid; it is not a full-resolution readout. Catalog camera dimensions are sourced; QE, read noise, dark current, full well and gain are editable assumptions.</p></section><section><h3>Catalog provenance & project files</h3><p>Every manufacturer reference links to its source. Some are archived specifications. No live stock, price or measured coating feed is connected. Ideal and custom components are explicitly identified. Changing a catalog parameter is shown as a model override. A parts list is a starting point for procurement, not a verified assembly.</p><p>Projects autosave in this browser and can be exported as versioned JSON including source images. Keep downloaded backups for long-term retention. The app imports the earlier OptiBench project format. Table drawings export as SVG; bill of materials, optical path and tolerance samples export as CSV.</p></section></div>`,
     true,
   );
 }

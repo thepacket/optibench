@@ -145,7 +145,7 @@ test("parts and template dialogs populate from the active project", () => {
   assert.match(el("#dialog-body").textContent, /6 placed components/);
   closeDialog();
   click('[data-action="templates"]');
-  assert.equal(document.querySelectorAll(".template-card").length, 7);
+  assert.equal(document.querySelectorAll(".template-card").length, 9);
   closeDialog();
 });
 test("template switching traces folded paths and leaves prior project undoable", () => {
@@ -242,4 +242,27 @@ test("mobile catalog drawer exposes inventory and closes cleanly", () => {
   click('[data-action="close-drawer"]');
   assert.equal(el("#drawer-scrim").hidden, true);
   globalThis.innerWidth = 1440;
+});
+
+test("interferometry setup, piston controls, phase scan and persistence", () => {
+  click('[data-action="templates"]');
+  click('[data-template="michelson"]');
+  assert.equal(el("#mode").value, "Interferometry");
+  assert.match(el("#fringe-quality").textContent, /Valid row fit/);
+  click('[data-action="select"][data-id="3"]');
+  change('[data-field="pistonNm"]', 100);
+  assert.equal(read().project.items.find((c) => c.id === 3).pistonNm, 100);
+  assert.equal(
+    JSON.parse(localStorage.getItem("optibench-lab-v2")).solver,
+    "Interferometry",
+  );
+  click('[data-action="phase-scan"]');
+  assert.match(el("#results-body").textContent, /Mirror piston scan/);
+  click('[data-action="undo"]');
+  assert.equal(read().project.items.find((c) => c.id === 3).pistonNm, 0);
+  change("#mode", "Gaussian");
+  assert.ok(el("#branch-select"));
+  click('[data-action="templates"]');
+  click('[data-template="mach-zehnder"]');
+  assert.match(el("#fringe-quality").textContent, /Valid row fit/);
 });
