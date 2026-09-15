@@ -184,7 +184,7 @@ Save the comparison project or export a Projects-compatible backup with both ben
 
 ## Collapsible side panels
 
-Use the close control in the inventory or component inspector header to collapse that panel completely. Reopen inventory with **Catalog** on the navigation rail and the inspector with **Inspector** beside the bench controls. Expanded panel widths remain adjustable with the inner-edge dividers and are restored when reopened. Collapse state and widths are remembered in this browser. Narrow screens retain the existing drawer behavior.
+Use the adjacent **Inventory** and **Inspector** toggle buttons beside the bench controls to open or fully close each panel. Their highlighted state indicates which panels are open. These are the only panel visibility controls; selecting components does not automatically open the inspector. Expanded panel widths remain adjustable with the inner-edge dividers and are restored when reopened. Collapse state and widths are remembered in this browser. Narrow screens retain the existing drawer behavior.
 
 The workspace profile/maximize toolbar has been removed to recover bench space. The workbench/detector divider remains available.
 

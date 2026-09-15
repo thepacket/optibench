@@ -234,14 +234,24 @@ test("pointer dragging uses both physical axes and snaps to actual hole centers"
   click('[data-action="undo"]');
   assert.equal(read().project.items.find((c) => c.id === 2).x, 400);
 });
-test("mobile catalog drawer exposes inventory and closes cleanly", () => {
-  globalThis.innerWidth = 700;
-  click('[data-action="library"]');
-  assert.equal(el("#drawer-scrim").hidden, false);
-  assert.ok(el("#library-panel").classList.contains("drawer-open"));
-  click('[data-action="close-drawer"]');
-  assert.equal(el("#drawer-scrim").hidden, true);
-  globalThis.innerWidth = 1440;
+test("paired panel toggles are the only visibility controls", () => {
+  const inventory = el('.inventory-toggle'), inspector = el('.inspector-toggle');
+  assert.equal(inventory.parentElement, inspector.parentElement);
+  assert.equal(document.querySelectorAll('[data-action="library"]').length, 1);
+  assert.equal(document.querySelectorAll('[data-action="inspect"]').length, 1);
+  assert.equal(el('[data-action="close-drawer"]'), null);
+  for (const [button, id] of [[inventory, 'library-panel'], [inspector, 'inspector-panel']]) {
+    const initial = button.getAttribute('aria-pressed');
+    button.click();
+    assert.equal(button.getAttribute('aria-pressed'), String(initial !== 'true'));
+    button.click();
+    assert.equal(button.getAttribute('aria-pressed'), initial);
+    assert.equal(button.getAttribute('aria-controls'), id);
+  }
+  if (inspector.getAttribute('aria-pressed') === 'true') inspector.click();
+  click('[data-action="select"][data-id="2"]');
+  assert.equal(inspector.getAttribute('aria-pressed'), 'false');
+  inspector.click();
 });
 
 test("interferometry setup, piston controls, phase scan and persistence", () => {

@@ -2899,3 +2899,12 @@ dialog::backdrop {
 .inventory-toggle span, .inspector-toggle span { display:inline !important; }
 @media(min-width:920px){.app-layout[data-inventory-collapsed="false"] .inventory-toggle{display:none;}}
 .workbar { overflow-x:auto; }
+
+/* The paired toggles are the sole panel visibility controls. */
+.panel-toggles{display:inline-flex;flex-wrap:nowrap;gap:4px;flex-shrink:0;align-items:center;}
+.panel-toggles .inventory-toggle,.panel-toggles .inspector-toggle{display:inline-flex !important;font-size:12px;padding:6px 8px;min-height:32px;white-space:nowrap;border:1px solid #506073;}
+.panel-toggles button[aria-pressed="true"]{background:#b7e97d22;color:var(--lime);border-color:var(--lime);}
+#drawer-scrim{display:none !important;}
+@media(max-width:1279px){.inspector.drawer-open{top:var(--side-panel-top,160px);max-width:calc(100vw - 62px);}}
+@media(max-width:919px){.library.drawer-open{top:var(--side-panel-top,160px);max-width:calc(100vw - 62px);}.app-layout[data-inventory-collapsed="false"][data-inspector-collapsed="false"]>.drawer-open{width:calc((100vw - 62px)/2);}}
+@media(max-width:600px){.library.drawer-open{left:50px;max-width:calc(100vw - 50px);}.app-layout[data-inventory-collapsed="false"][data-inspector-collapsed="false"]>.drawer-open{width:calc((100vw - 50px)/2);}}

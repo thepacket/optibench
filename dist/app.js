@@ -83,7 +83,6 @@ let selected = new Set([project.items[1]?.id].filter(Boolean)),
   scope = "All entries",
   sort = "recommended",
   resultTab = project.solver === "Alignment" ? "alignment" : "detector",
-  drawer = "",
   activeDetector = null,
   result,
   rayResult,
@@ -212,7 +211,6 @@ function mount() {
       ["projects", "folder", "Projects"],
       ["first-experiment", "play", "First lab"],
       ["alignment-practice", "target", "Practice"],
-      ["library", "lens", "Catalog"],
       ["templates", "book", "Setups"],
       ["design", "bolt", "Design"],
       ["analysis", "chart", "Analysis"],
@@ -224,7 +222,7 @@ function mount() {
       .map(([a, i, t]) => button(a, t, i, a === "bench" ? "active" : ""))
       .join(
         "",
-      )}<div class="rail-spacer"></div>${button("table", "Table", "settings")}${button("guide", "Guide", "info")}</nav><aside class="library panel" id="library-panel"><div class="panel-title"><h2>Component inventory</h2>${iconButton("close-drawer", "Close inventory", "close", "drawer-close")}</div><div class="inventory-summary"><strong>${catalog.length}</strong> entries <span>·</span> <strong>${catalog.filter((c) => c.provenance !== "ideal").length}</strong> manufacturer references</div><label class="searchbox">${icon("search")}<input id="search" aria-label="Search inventory" placeholder="Part number or component…" value="${esc(query)}"><kbd>⌘K</kbd></label><div class="library-filters"><select id="category" aria-label="Component category">${categories.map((c) => `<option ${category === c ? "selected" : ""}>${c}</option>`).join("")}</select><select id="brand" aria-label="Manufacturer">${["All manufacturers", "Thorlabs", "Edmund Optics", "Newport", "OptiBench", "Custom"].map((c) => `<option ${brand === c ? "selected" : ""}>${c}</option>`).join("")}</select><select id="scope" aria-label="Catalog provenance">${["All entries", "Manufacturer references", "Ideal designs"].map((c) => `<option ${scope === c ? "selected" : ""}>${c}</option>`).join("")}</select></div><div class="inventory-sort"><span id="catalog-count"></span><select id="sort" aria-label="Sort inventory"><option value="recommended">Recommended</option><option value="focal">Focal length ↑</option><option value="diameter">Diameter ↑</option><option value="part">Part number</option></select></div><div id="catalog-list" class="catalog-list"></div><div class="library-footer">${button("custom", "Custom component", "plus")}${button("compare", "Compare (0)", "parts", "", 'id="compare-button"')}${button("import-catalog", "Import catalog JSON", "folder")}</div></aside><main class="workspace"><div class="workspace-heading"><div><p class="eyebrow">OPTICAL DESIGN WORKSPACE</p><h1 id="project-title">${esc(project.title)}</h1></div><div class="workspace-actions">${iconButton("undo", "Undo · Ctrl/Cmd Z", "undo")}${iconButton("redo", "Redo · Ctrl/Cmd Shift Z", "redo")}<span class="separator"></span>${button("run", "Pause", "pause", "accent", 'id="run-button"')}</div></div><div class="workbar"><div class="tools" role="group" aria-label="Table tools">${iconButton("tool-select", "Select & move · V", "cursor", "active")}${iconButton("tool-pan", "Pan table · H / middle-drag", "hand")}${iconButton("tool-measure", "Measure distance · M", "ruler")}<span class="separator"></span>${iconButton("fit", "Fit entire table · F", "fit")}${iconButton("grid", "Toggle mounting holes", "grid", "active")}</div><div class="mode-controls"><select id="mode" aria-label="Physics engine"><option>Gaussian</option><option>Rays</option><option>Fourier</option><option>Interferometry</option><option>Alignment</option></select><span class="mode-indicator" id="mode-indicator">ABCD + 2D PATH</span></div>${button("library", "Inventory", "lens", "compact inventory-toggle", 'aria-controls="library-panel" title="Open component inventory"')}${button("inspect", "Inspector", "settings", "compact inspector-toggle")}</div><div class="bench-stage" id="stage"><svg id="bench" xmlns="http://www.w3.org/2000/svg" aria-label="Laboratory optical table" tabindex="0"></svg><div class="canvas-top"><span id="table-label"></span><span id="coordinate-readout">X — &nbsp; Y — mm</span></div><div class="canvas-bottom"><div class="view-options"><label><input type="checkbox" id="envelope" checked>Envelope</label><label><input type="checkbox" id="labels" checked>Labels</label><button data-action="table">Table settings</button></div><div class="zoom-control">${button("zoom-out", "−")}<span id="zoom-readout">100%</span>${button("zoom-in", "+")}${iconButton("fit", "Fit table", "fit")}</div></div><div id="placement-hint" class="placement-hint" hidden></div></div><div id="results-splitter" role="separator" tabindex="0" aria-orientation="horizontal" aria-label="Resize workbench and detector results" aria-controls="results-panel" title="Drag to resize · Arrow keys to adjust · Double-click to reset"><span></span></div><section class="results-panel" id="results-panel"><div class="results-heading"><div class="result-tabs">${[
+      )}<div class="rail-spacer"></div>${button("table", "Table", "settings")}${button("guide", "Guide", "info")}</nav><aside class="library panel" id="library-panel"><div class="panel-title"><h2>Component inventory</h2></div><div class="inventory-summary"><strong>${catalog.length}</strong> entries <span>·</span> <strong>${catalog.filter((c) => c.provenance !== "ideal").length}</strong> manufacturer references</div><label class="searchbox">${icon("search")}<input id="search" aria-label="Search inventory" placeholder="Part number or component…" value="${esc(query)}"><kbd>⌘K</kbd></label><div class="library-filters"><select id="category" aria-label="Component category">${categories.map((c) => `<option ${category === c ? "selected" : ""}>${c}</option>`).join("")}</select><select id="brand" aria-label="Manufacturer">${["All manufacturers", "Thorlabs", "Edmund Optics", "Newport", "OptiBench", "Custom"].map((c) => `<option ${brand === c ? "selected" : ""}>${c}</option>`).join("")}</select><select id="scope" aria-label="Catalog provenance">${["All entries", "Manufacturer references", "Ideal designs"].map((c) => `<option ${scope === c ? "selected" : ""}>${c}</option>`).join("")}</select></div><div class="inventory-sort"><span id="catalog-count"></span><select id="sort" aria-label="Sort inventory"><option value="recommended">Recommended</option><option value="focal">Focal length ↑</option><option value="diameter">Diameter ↑</option><option value="part">Part number</option></select></div><div id="catalog-list" class="catalog-list"></div><div class="library-footer">${button("custom", "Custom component", "plus")}${button("compare", "Compare (0)", "parts", "", 'id="compare-button"')}${button("import-catalog", "Import catalog JSON", "folder")}</div></aside><main class="workspace"><div class="workspace-heading"><div><p class="eyebrow">OPTICAL DESIGN WORKSPACE</p><h1 id="project-title">${esc(project.title)}</h1></div><div class="workspace-actions">${iconButton("undo", "Undo · Ctrl/Cmd Z", "undo")}${iconButton("redo", "Redo · Ctrl/Cmd Shift Z", "redo")}<span class="separator"></span>${button("run", "Pause", "pause", "accent", 'id="run-button"')}</div></div><div class="workbar"><div class="tools" role="group" aria-label="Table tools">${iconButton("tool-select", "Select & move · V", "cursor", "active")}${iconButton("tool-pan", "Pan table · H / middle-drag", "hand")}${iconButton("tool-measure", "Measure distance · M", "ruler")}<span class="separator"></span>${iconButton("fit", "Fit entire table · F", "fit")}${iconButton("grid", "Toggle mounting holes", "grid", "active")}</div><div class="mode-controls"><select id="mode" aria-label="Physics engine"><option>Gaussian</option><option>Rays</option><option>Fourier</option><option>Interferometry</option><option>Alignment</option></select><span class="mode-indicator" id="mode-indicator">ABCD + 2D PATH</span></div><div class="panel-toggles" role="group" aria-label="Side panels">${button("library", "Inventory", "lens", "compact inventory-toggle", 'aria-controls="library-panel" aria-pressed="false"')}${button("inspect", "Inspector", "settings", "compact inspector-toggle", 'aria-controls="inspector-panel" aria-pressed="false"')}</div></div><div class="bench-stage" id="stage"><svg id="bench" xmlns="http://www.w3.org/2000/svg" aria-label="Laboratory optical table" tabindex="0"></svg><div class="canvas-top"><span id="table-label"></span><span id="coordinate-readout">X — &nbsp; Y — mm</span></div><div class="canvas-bottom"><div class="view-options"><label><input type="checkbox" id="envelope" checked>Envelope</label><label><input type="checkbox" id="labels" checked>Labels</label><button data-action="table">Table settings</button></div><div class="zoom-control">${button("zoom-out", "−")}<span id="zoom-readout">100%</span>${button("zoom-in", "+")}${iconButton("fit", "Fit table", "fit")}</div></div><div id="placement-hint" class="placement-hint" hidden></div></div><div id="results-splitter" role="separator" tabindex="0" aria-orientation="horizontal" aria-label="Resize workbench and detector results" aria-controls="results-panel" title="Drag to resize · Arrow keys to adjust · Double-click to reset"><span></span></div><section class="results-panel" id="results-panel"><div class="results-heading"><div class="result-tabs">${[
       ["detector", "Detector"],
       ["envelope", "Propagation"],
       ["alignment", "Alignment"],
@@ -237,7 +235,7 @@ function mount() {
       )
       .join(
         "",
-      )}</div><div class="results-tools"><select id="detector-select" aria-label="Active detector"></select>${iconButton("export-results", "Export numerical results", "download")}${iconButton("collapse-results", "Collapse or expand results", "chevron")}</div></div><div id="results-body" tabindex="0" role="region" aria-label="Detector and propagation results"></div></section><footer><span id="trace-status"></span><span id="save-state">${saveStatus}</span><span>OptiBench · engine ${ENGINE_VERSION}</span></footer></main><aside class="inspector panel" id="inspector-panel"><div class="panel-title"><h2>Component inspector</h2>${iconButton("close-drawer", "Close inspector", "close", "drawer-close")}</div><div id="inspector-body"></div></aside></div><div id="toast" role="status"></div><div id="drawer-scrim" hidden></div><dialog id="dialog"><div class="dialog-heading"><h2 id="dialog-title"></h2>${iconButton("close-dialog", "Close dialog", "close")}</div><div id="dialog-body"></div></dialog><input hidden id="project-file" type="file" accept=".json,application/json"><input hidden id="catalog-file" type="file" accept=".json,application/json"><input hidden id="image-file" type="file" accept="image/png,image/jpeg,image/webp">`;
+      )}</div><div class="results-tools"><select id="detector-select" aria-label="Active detector"></select>${iconButton("export-results", "Export numerical results", "download")}${iconButton("collapse-results", "Collapse or expand results", "chevron")}</div></div><div id="results-body" tabindex="0" role="region" aria-label="Detector and propagation results"></div></section><footer><span id="trace-status"></span><span id="save-state">${saveStatus}</span><span>OptiBench · engine ${ENGINE_VERSION}</span></footer></main><aside class="inspector panel" id="inspector-panel"><div class="panel-title"><h2>Component inspector</h2></div><div id="inspector-body"></div></aside></div><div id="toast" role="status"></div><div id="drawer-scrim" hidden></div><dialog id="dialog"><div class="dialog-heading"><h2 id="dialog-title"></h2>${iconButton("close-dialog", "Close dialog", "close")}</div><div id="dialog-body"></div></dialog><input hidden id="project-file" type="file" accept=".json,application/json"><input hidden id="catalog-file" type="file" accept=".json,application/json"><input hidden id="image-file" type="file" accept="image/png,image/jpeg,image/webp">`;
   bind();
   bindResultsSplitter({workspace: $(".workspace"), panel: $("#results-panel"), handle: $("#results-splitter"), expand: () => { if (!showResults) { showResults = true; renderResults(); } }});
   bindWorkspaceLayout({root: $(".app-layout"), panel: $("#results-panel")});
@@ -967,18 +965,6 @@ function snapPoint(p) {
     ),
   };
 }
-function openDrawer(which) {
-  if (which) $(".app-layout").dispatchEvent(new document.defaultView.CustomEvent("set-panel-open", {detail:{name:which === "library" ? "inventory" : "inspector", open:true}}));
-  if (
-    (which === "library" && innerWidth >= 920) ||
-    (which === "inspector" && innerWidth >= 1280)
-  )
-    which = "";
-  drawer = which;
-  $("#library-panel").classList.toggle("drawer-open", which === "library");
-  $("#inspector-panel").classList.toggle("drawer-open", which === "inspector");
-  $("#drawer-scrim").hidden = !which;
-}
 function closeDialog() {
   $("#dialog").close();
   $("#dialog-body").innerHTML = "";
@@ -1014,7 +1000,6 @@ function placePart(part, p) {
   pendingPart = null;
   tool = "select";
   commit();
-  if (innerWidth < 1280) openDrawer("inspector");
 }
 function zoom(factor, p = { x: view.x + view.w / 2, y: view.y + view.h / 2 }) {
   const next = clamp(view.w * factor, 150, project.table.width * 4),
@@ -1056,7 +1041,6 @@ function bind() {
     }
   });
   document.addEventListener("submit", handleSubmit);
-  $("#drawer-scrim").onclick = () => openDrawer("");
   $("#dialog").addEventListener("cancel", () => {
     pendingPart = null;
   });
@@ -1173,7 +1157,6 @@ function bind() {
     if (dragState?.kind === "component") {
       const moved = dragState.moved;
       if (moved) commit();
-      else if (innerWidth < 1280 && selected.size) openDrawer("inspector");
     }
     dragState = null;
   });
@@ -1214,14 +1197,12 @@ function bind() {
     }
     if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
       e.preventDefault();
-      openDrawer("library");
-      $("#search").focus();
+      ($("#library-panel").getClientRects().length ? $("#search") : $(".inventory-toggle")).focus();
       return;
     }
     if (e.key === "Escape") {
       pendingPart = null;
       measureStart = null;
-      openDrawer("");
       drawBench();
       renderPanels();
       return;
@@ -1518,21 +1499,11 @@ function handleClick(e) {
       measurementWorkspace.open();
       break;
     case "bench":
-      openDrawer("");
       fit();
       break;
     case "library":
-      openDrawer("library");
-      $("#search").focus();
-      break;
     case "inspect":
-      openDrawer("inspector");
-      break;
-    case "close-drawer":
-      { const side = e.target.closest(".panel")?.id;
-        if (side) $(".app-layout").dispatchEvent(new document.defaultView.CustomEvent("set-panel-open", {detail:{name:side === "library-panel" ? "inventory" : "inspector",open:false}}));
-      }
-      openDrawer("");
+      $(".app-layout").dispatchEvent(new document.defaultView.CustomEvent("toggle-panel", {detail:{name:a === "library" ? "inventory" : "inspector"}}));
       break;
     case "close-dialog":
       closeDialog();
@@ -1639,7 +1610,6 @@ function handleClick(e) {
       if (part) {
         pendingPart = part;
         tool = "select";
-        openDrawer("");
         if ($("#dialog").open) closeDialog();
         renderPanels();
       }
@@ -1681,7 +1651,6 @@ function handleClick(e) {
         renderInspector();
         drawBench();
         if (resultTab === "alignment") renderResults();
-        if (innerWidth < 1280) openDrawer("inspector");
       }
       break;
     case "rotate":
@@ -2238,7 +2207,6 @@ async function handleSubmit(e) {
         closeDialog();
         renderCatalog();
         pendingPart = c;
-        openDrawer("");
         renderPanels();
         break;
       }

@@ -49,6 +49,14 @@ export function bindWorkspaceLayout({ root, panel }) {
     root.style.setProperty("--inspector-width", inspector + "px");
     root.dataset.inventoryCollapsed = String(collapsed.inventory);
     root.dataset.inspectorCollapsed = String(collapsed.inspector);
+    for (const [name,id,action,breakpoint] of [["inventory","library-panel","library",920],["inspector","inspector-panel","inspect",1280]]) {
+      const target=document.getElementById(id);
+      target.classList.toggle("drawer-open", !collapsed[name] && width < breakpoint);
+      const button=root.querySelector(`[data-action="${action}"]`);
+      if(button){button.setAttribute("aria-pressed",String(!collapsed[name]));button.setAttribute("aria-expanded",String(!collapsed[name]));}
+    }
+    const bar=root.querySelector(".workbar");
+    if(bar)root.style.setProperty("--side-panel-top",Math.max(58,bar.getBoundingClientRect().bottom)+"px");
     for (const { el, name } of handles)
       el.setAttribute(
         "aria-valuenow",
@@ -115,11 +123,10 @@ export function bindWorkspaceLayout({ root, panel }) {
       persist();
     };
   }
-  root.addEventListener("set-panel-open", (e) => {
-    const { name, open } = e.detail || {};
-    if (!["inventory", "inspector"].includes(name) || typeof open !== "boolean")
-      return;
-    collapsed[name] = !open;
+  root.addEventListener("toggle-panel", (e) => {
+    const { name } = e.detail || {};
+    if (!["inventory", "inspector"].includes(name)) return;
+    collapsed[name] = !collapsed[name];
     applyWidths();
     persist();
   });
