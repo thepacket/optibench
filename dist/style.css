@@ -2812,3 +2812,11 @@ dialog::backdrop {
     max-width: 200px;
   }
 }
+
+.measurement-quality { margin: 20px 0; }
+.quality-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 10px; }
+.quality-grid article { border: 1px solid #3c4c5c; border-left: 3px solid #789bba; padding: 12px; border-radius: 6px; }
+.quality-grid article[data-quality="review"] { border-left-color: #edba65; }
+.quality-grid span { display: block; color: #a9bfd0; font-size: 12px; margin-top: 5px; }
+.quality-grid p { font-size: 14px; line-height: 1.5; margin-bottom: 0; }
+#measurement-study { border-top: 1px solid #3c4c5c; margin-top: 24px; padding-top: 16px; }

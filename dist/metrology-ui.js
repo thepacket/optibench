@@ -1,3 +1,5 @@
+import { measurementQuality } from "./measurement-quality.js";
+import { analyzeRepeats, repeatCSV, repeatMapCSV } from "./repeatability.js";
 import { decodeTIFF, decodeNumericalImage } from "./scientific-images.js";
 import {
   subtractReference,
@@ -47,6 +49,11 @@ export function createMetrologyWorkspace({
     settings = defaultMeasurementSettings(),
     result = null,
     runs = [],
+    repeatIds = new Set(),
+    study = null,
+    repeatVerified = false,
+    acquiredAt = "",
+    acquisitionId = null,
     selectedRuns = new Set(),
     name = "Untitled measurement",
     notes = "",
@@ -116,7 +123,7 @@ export function createMetrologyWorkspace({
       )
       .join(
         "",
-      )}</select></header><canvas id="measurement-map" aria-label="Reconstructed phase or height map"></canvas><p id="measurement-map-scale">${result ? "" : "No result yet. Invalid pixels appear dark."}</p></article></div><div id="measurement-results"></div><div id="measurement-advanced"></div><label class="measurement-notes">Experiment notes<textarea id="measurement-notes" rows="3" placeholder="Sample, camera settings, calibration references and observations…">${esc(notes)}</textarea></label><section class="measurement-records"><header><h2>Saved experiments</h2><span>Stored on this browser · export JSON for backup</span></header><div id="measurement-runs"></div></section><details class="measurement-model"><summary>Methods, calibration and interpretation</summary><p>Four-step reconstruction assumes registered linear-intensity frames I(φ + δ), δ = 0°, 90°, 180°, 270°, with unchanged exposure. Phase is atan2(I270 − I90, I0 − I180). Dark is subtracted before optional division by flat − dark. A flat should be an unfringed illumination reference acquired at compatible settings.</p><p>Single-image analysis applies a Hann window and isolates a tapered Fourier sideband. The positive-half-plane automatic choice defines a sign convention; physical sign requires a known reference. Filtering limits spatial resolution. The outer 10% of the ROI is excluded. Adjust the sideband and check stability of the reconstruction.</p><p>Quality-guided unwrapping assumes adjacent valid phase differences below π. Only the strongest connected region is retained. Discontinuities and inconsistent edges can invalidate heights. OPD = λφ/(2π); reflecting height = λφ/(4π cos θ). Pixel scale must be calibrated at the sample plane. Reported PV and RMS describe the retained region after the selected plane removal; they are not uncertainty bounds.</p><p>PNG/JPEG/WebP are browser-decoded 8-bit luminance. TIFF preserves unsigned 8/16-bit monochrome samples (single-page strips, top-left orientation; uncompressed, LZW, PackBits or Deflate). Numerical JSON contains width, height, fullScale and flat row-major values. Neither path interprets sensor RAW. Reference subtraction uses translation only, bilinear interpolation and the valid-mask intersection; it removes the common mean. Rotation, distortion and absolute piston are not recovered. Keep original camera files separately. Saved runs contain the exact decoded samples used, calibration frames, settings, bench snapshot and results. Files remain local; no acquisition hardware is connected.</p><p><a href="https://opg.optica.org/josa/abstract.cfm?uri=josa-72-1-156" target="_blank" rel="noopener">Takeda et al. · Fourier fringe analysis</a> · <a href="https://arxiv.org/abs/1501.04738" target="_blank" rel="noopener">Four-step phase calibration</a></p></details></main></div><input id="measurement-files" type="file" accept="image/png,image/jpeg,image/webp,image/tiff,.tif,.tiff,.json" hidden multiple><input id="measurement-calibration" type="file" accept="image/png,image/jpeg,image/webp,image/tiff,.tif,.tiff,.json" hidden><input id="measurement-run-file" type="file" accept="application/json,.json" hidden>`;
+      )}</select></header><canvas id="measurement-map" aria-label="Reconstructed phase or height map"></canvas><p id="measurement-map-scale">${result ? "" : "No result yet. Invalid pixels appear dark."}</p></article></div><label class="measurement-notes">Acquisition time · ISO 8601 with timezone<input id="measurement-acquired" value="${esc(acquiredAt)}" placeholder="2026-09-15T14:30:00-04:00"><small>Enter the actual camera acquisition time; leave blank when unknown.</small></label><div id="measurement-results"></div><div id="measurement-advanced"></div><label class="measurement-notes">Experiment notes<textarea id="measurement-notes" rows="3" placeholder="Sample, camera settings, calibration references and observations…">${esc(notes)}</textarea></label><section class="measurement-records"><header><h2>Saved experiments</h2><span>Stored on this browser · export JSON for backup</span></header><div id="measurement-runs"></div><div id="measurement-study"></div></section><details class="measurement-model"><summary>Methods, calibration and interpretation</summary><p>Four-step reconstruction assumes registered linear-intensity frames I(φ + δ), δ = 0°, 90°, 180°, 270°, with unchanged exposure. Phase is atan2(I270 − I90, I0 − I180). Dark is subtracted before optional division by flat − dark. A flat should be an unfringed illumination reference acquired at compatible settings.</p><p>Single-image analysis applies a Hann window and isolates a tapered Fourier sideband. The positive-half-plane automatic choice defines a sign convention; physical sign requires a known reference. Filtering limits spatial resolution. The outer 10% of the ROI is excluded. Adjust the sideband and check stability of the reconstruction.</p><p>Quality-guided unwrapping assumes adjacent valid phase differences below π. Only the strongest connected region is retained. Discontinuities and inconsistent edges can invalidate heights. OPD = λφ/(2π); reflecting height = λφ/(4π cos θ). Pixel scale must be calibrated at the sample plane. Reported PV and RMS describe the retained region after the selected plane removal; they are not uncertainty bounds.</p><p>PNG/JPEG/WebP are browser-decoded 8-bit luminance. TIFF preserves unsigned 8/16-bit monochrome samples (single-page strips, top-left orientation; uncompressed, LZW, PackBits or Deflate). Numerical JSON contains width, height, fullScale and flat row-major values. Neither path interprets sensor RAW. Reference subtraction uses translation only, bilinear interpolation and the valid-mask intersection; it removes the common mean. Rotation, distortion and absolute piston are not recovered. Keep original camera files separately. Saved runs contain the exact decoded samples used, calibration frames, settings, bench snapshot and results. Files remain local; no acquisition hardware is connected.</p><p><a href="https://opg.optica.org/josa/abstract.cfm?uri=josa-72-1-156" target="_blank" rel="noopener">Takeda et al. · Fourier fringe analysis</a> · <a href="https://arxiv.org/abs/1501.04738" target="_blank" rel="noopener">Four-step phase calibration</a></p></details></main></div><input id="measurement-files" type="file" accept="image/png,image/jpeg,image/webp,image/tiff,.tif,.tiff,.json" hidden multiple><input id="measurement-calibration" type="file" accept="image/png,image/jpeg,image/webp,image/tiff,.tif,.tiff,.json" hidden><input id="measurement-run-file" type="file" accept="application/json,.json" hidden>`;
     renderResults();
     renderAdvanced();
     renderRuns();
@@ -131,13 +138,15 @@ export function createMetrologyWorkspace({
     const s = result.stats;
     $("#measurement-results").innerHTML =
       `<div class="measurement-metrics"><div><span>Peak to valley</span><strong>${fmt(s.pvNm)} <small>nm</small></strong></div><div><span>RMS · mean removed</span><strong>${fmt(s.rmsNm)} <small>nm</small></strong></div><div><span>Valid connected area</span><strong>${fmt(s.validFraction * 100, 1)}%</strong></div><div><span>Mean visibility</span><strong>${fmt(s.meanVisibility * 100, 1)}%</strong></div></div><div class="measurement-diagnostics">${result.carrier ? `<p>Carrier (${result.carrier.x}, ${result.carrier.y}) bins · period ${fmt(result.carrier.periodPixels)} px · normal ${fmt(result.carrier.normalAngle, 1)}°</p>` : `<p>Phase-step consistency residual: ${fmt(s.stepResidual * 100, 3)}% · ${s.unwrapConflicts} unwrap conflicts</p>`}${result.warnings.map((w) => `<p class="measurement-warning">${esc(w)}</p>`).join("")}<p>${esc(result.unit)} · ${settings.removeTilt ? "plane" : "mean"} removed · engine ${METROLOGY_VERSION}</p></div><div class="measurement-buttons"><button data-measure="csv">Export pixel CSV</button><button data-measure="report">Export report</button></div>`;
+    $("#measurement-results").insertAdjacentHTML("beforeend", qualityHTML());
     paintResult();
   }
   function renderRuns() {
     if (!$("#measurement-runs")) return;
     $("#measurement-runs").innerHTML = runs.length
-      ? `<div class="measurement-table-scroll"><table><thead><tr><th>Compare</th><th>Experiment</th><th>Source / method</th><th>PV / RMS (nm)</th><th>Valid</th><th>Actions</th></tr></thead><tbody>${runs.map((r) => `<tr><td><input type="checkbox" data-run-compare="${esc(r.id)}" aria-label="Compare ${esc(r.name)}" ${selectedRuns.has(r.id) ? "checked" : ""}></td><td>${esc(r.name)}<small>${esc(new Date(r.createdAt).toLocaleString())}</small></td><td>${esc(r.frames[0]?.origin)}<small>${esc(r.settings.method)} · ${esc(r.settings.geometry)}</small></td><td>${fmt(r.result.stats.pvNm)} / ${fmt(r.result.stats.rmsNm)}</td><td>${fmt(r.result.stats.validFraction * 100, 1)}%</td><td><button data-measure="load-run" data-id="${esc(r.id)}">Open</button><button data-measure="delete-run" data-id="${esc(r.id)}">Delete</button></td></tr>`).join("")}</tbody></table></div><div id="measurement-comparison"></div>`
+      ? `<div class="measurement-table-scroll"><table><thead><tr><th>Compare / Repeat</th><th>Experiment</th><th>Source / method</th><th>PV / RMS (nm)</th><th>Valid</th><th>Actions</th></tr></thead><tbody>${runs.map((r) => `<tr><td><input type="checkbox" data-run-compare="${esc(r.id)}" aria-label="Compare ${esc(r.name)}" ${selectedRuns.has(r.id) ? "checked" : ""}><label class="measurement-check"><input type="checkbox" data-repeat-id="${esc(r.id)}" ${repeatIds.has(r.id) ? "checked" : ""}>Repeat</label></td><td>${esc(r.name)}<small>${esc(new Date(r.createdAt).toLocaleString())}</small></td><td>${esc(r.frames[0]?.origin)}<small>${esc(r.settings.method)} · ${esc(r.settings.geometry)}</small></td><td>${fmt(r.result.stats.pvNm)} / ${fmt(r.result.stats.rmsNm)}</td><td>${fmt(r.result.stats.validFraction * 100, 1)}%</td><td><button data-measure="load-run" data-id="${esc(r.id)}">Open</button><button data-measure="delete-run" data-id="${esc(r.id)}">Delete</button></td></tr>`).join("")}</tbody></table></div><div id="measurement-comparison"></div>`
       : '<p class="measurement-help">Save a reconstruction to preserve its images, calibration, setup and results.</p>';
+    renderStudy();
     const pair = runs.filter((r) => selectedRuns.has(r.id));
     if (pair.length === 2) {
       const [a, b] = pair,
@@ -145,6 +154,48 @@ export function createMetrologyWorkspace({
       $("#measurement-comparison").innerHTML =
         `<p><b>${esc(a.name)} − ${esc(b.name)}</b>: ΔPV ${fmt(a.result.stats.pvNm - b.result.stats.pvNm)} nm · ΔRMS ${fmt(a.result.stats.rmsNm - b.result.stats.rmsNm)} nm.</p><p>${compatible ? "Same analysis settings; confirm matching samples and image registration before interpreting differences." : "Different analysis settings. This is a summary comparison; values are not directly interchangeable."}</p>`;
     }
+  }
+  async function computeStudy() {
+    const selected = runs.filter((r) => repeatIds.has(r.id));
+    if (typeof Worker === "undefined")
+      return analyzeRepeats(selected, { verified: repeatVerified });
+    const w = new Worker(
+      new URL("./repeatability-worker.js", import.meta.url),
+      { type: "module" },
+    );
+    try {
+      return await new Promise((resolve, reject) => {
+        w.onmessage = ({ data }) =>
+          data.error ? reject(Error(data.error)) : resolve(data.result);
+        w.onerror = () =>
+          reject(
+            Error(
+              "Repeatability analysis could not run. Reload and try again.",
+            ),
+          );
+        w.postMessage({ runs: selected, verified: repeatVerified });
+      });
+    } finally {
+      w.terminate();
+    }
+  }
+  function qualityHTML() {
+    if (!result) return "";
+    const q = measurementQuality(result, frames, {
+      reference: !!reference,
+      registration,
+    });
+    return `<section class="measurement-quality"><h2>Measurement quality · ${q.status === "review" ? "Review needed" : "No automatic flags"}</h2><p>Review thresholds are screening aids, not acceptance criteria or uncertainty bounds.</p><div class="quality-grid">${q.checks.map((c) => `<article data-quality="${c.level}"><b>${esc(c.name)}</b><span>${esc(c.level)}</span><p>${esc(c.detail)}</p></article>`).join("")}</div></section>`;
+  }
+  function studyHTML() {
+    if (!study)
+      return "<p>Select 3–20 independently acquired saved runs. Only sample wavefronts are compared; reference differences are not used.</p>";
+    return `<div class="measurement-metrics"><div><span>Acquisitions / shared area</span><strong>${study.rows.length} / ${fmt(study.commonFraction * 100, 1)}%</strong></div><div><span>PV mean ± sample SD</span><strong>${fmt(study.pv.mean)} ± ${fmt(study.pv.sd)} nm</strong></div><div><span>RMS mean ± sample SD</span><strong>${fmt(study.rms.mean)} ± ${fmt(study.rms.sd)} nm</strong></div><div><span>Spatial RMS of temporal SD</span><strong>${fmt(study.pixelRepeatabilityNm)} nm</strong></div></div><p>Linear PV drift ${fmt(study.pvDriftNmMin, 4)} nm/min · RMS drift ${fmt(study.rmsDriftNmMin, 4)} nm/min. Rates use actual acquisition times.</p>${study.warnings.map((w) => `<p class="measurement-warning">${esc(w)}</p>`).join("")}<div class="measurement-table-scroll"><table><thead><tr><th>Acquisition</th><th>Time</th><th>PV · nm</th><th>RMS · nm</th><th>Quality</th></tr></thead><tbody>${study.rows.map((r) => `<tr><td>${esc(r.name)}</td><td>${esc(r.acquiredAt || "Unknown")}</td><td>${fmt(r.pvNm)}</td><td>${fmt(r.rmsNm)}</td><td>${esc(r.quality.status)}</td></tr>`).join("")}</tbody></table></div>`;
+  }
+  function renderStudy() {
+    const target = $("#measurement-study");
+    if (!target) return;
+    target.innerHTML = `<h2>Repeatability study</h2><p>${repeatIds.size} acquisitions selected</p><label class="measurement-check"><input id="repeat-verified" type="checkbox" ${repeatVerified ? "checked" : ""}>I verified independent acquisitions of the same sample, spatial registration and unchanged conditions.</label><div class="measurement-buttons"><button data-measure="analyze-repeats" ${repeatIds.size >= 3 && repeatVerified ? "" : "disabled"}>Analyze repeats</button><button data-measure="clear-repeats">Clear selection</button><button data-measure="repeat-csv" ${study ? "" : "disabled"}>Summary CSV</button><button data-measure="repeat-map" ${study ? "" : "disabled"}>Mean / SD map CSV</button><button data-measure="repeat-json" ${study ? "" : "disabled"}>Export study JSON</button><button data-measure="repeat-report" ${study ? "" : "disabled"}>Export study report</button></div>${studyHTML()}`;
   }
   function referenceRecord(r) {
     if (!r?.frames || !r.settings)
@@ -371,6 +422,8 @@ export function createMetrologyWorkspace({
       version: 1,
       id: crypto.randomUUID(),
       createdAt: new Date().toISOString(),
+      acquiredAt: acquiredAt || null,
+      acquisitionId,
       name: name.trim() || "Untitled measurement",
       notes,
       engine: METROLOGY_VERSION,
@@ -448,6 +501,8 @@ export function createMetrologyWorkspace({
     validateMeasurementSettings(r.settings, r.frames[0]);
     if (r.dark) validateFrame(r.dark);
     if (r.flat) validateFrame(r.flat);
+    acquiredAt = typeof r.acquiredAt === "string" ? r.acquiredAt : "";
+    acquisitionId = r.acquisitionId || null;
     frames = r.frames;
     dark = r.dark ?? null;
     flat = r.flat ?? null;
@@ -487,6 +542,51 @@ export function createMetrologyWorkspace({
     if ((busy || importing) && action !== "close") return;
     try {
       switch (action) {
+        case "analyze-repeats": {
+          status("Reconstructing selected acquisitions…");
+          busy = true;
+          try {
+            await new Promise((resolve) => setTimeout(resolve, 0));
+            study = await computeStudy();
+            status(
+              "Repeatability study complete over the common valid region.",
+            );
+          } finally {
+            busy = false;
+            renderStudy();
+          }
+          return;
+        }
+        case "clear-repeats":
+          repeatIds.clear();
+          repeatVerified = false;
+          study = null;
+          renderRuns();
+          return;
+        case "repeat-csv":
+          download("repeatability-summary.csv", repeatCSV(study), "text/csv");
+          return;
+        case "repeat-map":
+          download("repeatability-maps.csv", repeatMapCSV(study), "text/csv");
+          return;
+        case "repeat-json":
+          download(
+            "repeatability-study.json",
+            JSON.stringify(
+              serializable({
+                ...study,
+                acquisitions: runs.filter((r) => repeatIds.has(r.id)),
+              }),
+            ),
+          );
+          return;
+        case "repeat-report":
+          download(
+            "repeatability-report.html",
+            `<!doctype html><html lang="en"><meta charset="utf-8"><title>Repeatability study</title><style>body{font:16px system-ui;max-width:1000px;margin:40px auto;padding:20px}td,th{padding:10px;border:1px solid #aaa}table{border-collapse:collapse}</style><h1>OptiBench repeatability study</h1>${studyHTML()}<h2>Analysis settings</h2><pre>${esc(JSON.stringify(study.settings, null, 2))}</pre><p>All maps use the common valid region with a separate mean removed from each acquisition. Export study JSON to retain the contributing data.</p></html>`,
+            "text/html",
+          );
+          return;
         case "image-template":
           download(
             "intensity-template.json",
@@ -532,6 +632,8 @@ export function createMetrologyWorkspace({
             document.querySelector("#app").inert = false;
           return;
         case "demo":
+          acquiredAt = "";
+          acquisitionId = crypto.randomUUID();
           frames = demoFrames();
           if (settings.method === "fourier") frames = frames.slice(0, 1);
           dark = flat = null;
@@ -548,6 +650,8 @@ export function createMetrologyWorkspace({
           return;
         case "capture": {
           const captured = capture(settings.method);
+          acquiredAt = new Date().toISOString();
+          acquisitionId = crypto.randomUUID();
           frames = captured.frames;
           dark = flat = null;
           settings = {
@@ -612,6 +716,9 @@ export function createMetrologyWorkspace({
         case "delete-run":
           await store.remove(b.dataset.id);
           selectedRuns.delete(b.dataset.id);
+          repeatIds.delete(b.dataset.id);
+          study = null;
+          repeatVerified = false;
           await refreshRuns();
           status(
             "Saved experiment deleted. The currently loaded data remains available.",
@@ -629,7 +736,7 @@ export function createMetrologyWorkspace({
             map = $("#measurement-map").toDataURL("image/png");
           download(
             "optibench-measurement-report.html",
-            `<!doctype html><html lang="en"><meta charset="utf-8"><title>${esc(r.name)}</title><style>body{font:16px system-ui;max-width:900px;margin:40px auto;padding:24px;color:#17212b}table{border-collapse:collapse}td,th{border:1px solid #bbb;padding:8px;text-align:left}img{max-width:512px;width:100%}pre{white-space:pre-wrap}small{color:#555}</style><h1>${esc(r.name)}</h1><p>${esc(r.createdAt)} · OptiBench metrology ${METROLOGY_VERSION}</p><p>${esc(frames[0].origin)} · ${esc(result.unit)} · ${settings.removeTilt ? "fitted plane" : "mean"} removed</p><table><tr><th>PV</th><th>RMS</th><th>Valid area</th><th>Visibility</th></tr><tr><td>${fmt(result.stats.pvNm)} nm</td><td>${fmt(result.stats.rmsNm)} nm</td><td>${fmt(result.stats.validFraction * 100)}%</td><td>${fmt(result.stats.meanVisibility * 100)}%</td></tr></table><h2>${esc(view)} map</h2><img alt="Measurement map" src="${map}"><p>${esc($("#measurement-map-scale").textContent)}</p><h2>Settings</h2><pre>${esc(JSON.stringify(settings, null, 2))}</pre><h2>Input frames</h2><ul>${frames.map((f) => `<li>${esc(f.name)} · ${f.width} × ${f.height} · ${esc(f.precision || "normalized intensity")} · full scale ${esc(f.fullScale || 1)}</li>`).join("")}</ul><p>Dark: ${esc(dark?.name || "none")} · Flat: ${esc(flat?.name || "none")}</p><h2>Diagnostics</h2><ul>${result.warnings.map((w) => `<li>${esc(w)}</li>`).join("")}</ul><p>Unwrap conflicts: ${result.stats.unwrapConflicts}. Phase-step residual: ${fmt(result.stats.stepResidual, 6)}. PV and RMS are descriptive statistics, not uncertainty bounds. Relative fringe order and calibrated pixel scale remain the experimenter’s responsibility. Single-image phase sign requires a reference. Keep the exported run JSON and original camera files with this report.</p>${referenceReport()}<h2>Cross-section</h2>${profileSVG()}<h2>Notes</h2><pre>${esc(notes)}</pre></html>`,
+            `<!doctype html><html lang="en"><meta charset="utf-8"><title>${esc(r.name)}</title><style>body{font:16px system-ui;max-width:900px;margin:40px auto;padding:24px;color:#17212b}table{border-collapse:collapse}td,th{border:1px solid #bbb;padding:8px;text-align:left}img{max-width:512px;width:100%}pre{white-space:pre-wrap}small{color:#555}</style><h1>${esc(r.name)}</h1><p>${esc(r.createdAt)} · OptiBench metrology ${METROLOGY_VERSION}</p><p>${esc(frames[0].origin)} · ${esc(result.unit)} · ${settings.removeTilt ? "fitted plane" : "mean"} removed</p><table><tr><th>PV</th><th>RMS</th><th>Valid area</th><th>Visibility</th></tr><tr><td>${fmt(result.stats.pvNm)} nm</td><td>${fmt(result.stats.rmsNm)} nm</td><td>${fmt(result.stats.validFraction * 100)}%</td><td>${fmt(result.stats.meanVisibility * 100)}%</td></tr></table><h2>${esc(view)} map</h2><img alt="Measurement map" src="${map}"><p>${esc($("#measurement-map-scale").textContent)}</p><p>Acquisition time: ${esc(acquiredAt || "Unknown")}</p><h2>Settings</h2><pre>${esc(JSON.stringify(settings, null, 2))}</pre><h2>Input frames</h2><ul>${frames.map((f) => `<li>${esc(f.name)} · ${f.width} × ${f.height} · ${esc(f.precision || "normalized intensity")} · full scale ${esc(f.fullScale || 1)}</li>`).join("")}</ul><p>Dark: ${esc(dark?.name || "none")} · Flat: ${esc(flat?.name || "none")}</p><h2>Diagnostics</h2><ul>${result.warnings.map((w) => `<li>${esc(w)}</li>`).join("")}</ul><p>Unwrap conflicts: ${result.stats.unwrapConflicts}. Phase-step residual: ${fmt(result.stats.stepResidual, 6)}. PV and RMS are descriptive statistics, not uncertainty bounds. Relative fringe order and calibrated pixel scale remain the experimenter’s responsibility. Single-image phase sign requires a reference. Keep the exported run JSON and original camera files with this report.</p>${qualityHTML()}${referenceReport()}<h2>Cross-section</h2>${profileSVG()}<h2>Notes</h2><pre>${esc(notes)}</pre></html>`,
             "text/html",
           );
           return;
@@ -647,6 +754,38 @@ export function createMetrologyWorkspace({
       return;
     }
     try {
+      if (el.id === "measurement-acquired") {
+        const v = el.value.trim();
+        if (
+          v &&
+          (!/T.*(?:Z|[+-]\d{2}:\d{2})$/.test(v) ||
+            !Number.isFinite(Date.parse(v)))
+        )
+          throw Error(
+            "Use ISO 8601 acquisition time with timezone, or leave blank.",
+          );
+        acquiredAt = v ? new Date(v).toISOString() : "";
+        return;
+      }
+      if (el.dataset.repeatId) {
+        if (el.checked) {
+          if (repeatIds.size >= 20) {
+            el.checked = false;
+            throw Error("At most 20 acquisitions per study.");
+          }
+          repeatIds.add(el.dataset.repeatId);
+        } else repeatIds.delete(el.dataset.repeatId);
+        repeatVerified = false;
+        study = null;
+        renderStudy();
+        return;
+      }
+      if (el.id === "repeat-verified") {
+        repeatVerified = el.checked;
+        study = null;
+        renderStudy();
+        return;
+      }
       if (el.id === "measurement-reference") {
         reference = el.value
           ? referenceRecord(runs.find((r) => r.id === el.value) || reference)
@@ -739,6 +878,8 @@ export function createMetrologyWorkspace({
           )
         )
           throw Error("All four frames must have the same dimensions.");
+        acquiredAt = "";
+        acquisitionId = crypto.randomUUID();
         frames = decoded;
         dark = flat = null;
         sourceProject = structuredClone(getProject());

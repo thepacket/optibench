@@ -232,3 +232,40 @@ test("reference comparison saves, restores and invalidates registration with edi
   assert.equal($('[data-measure="apply-reference"]').disabled, true);
   assert.equal($('[data-measure="difference-csv"]').disabled, true);
 });
+
+test("repeat study workflow verifies acquisitions, exports and clears stale studies", async () => {
+  await click("clear-repeats");
+  const ids = [];
+  for (let i = 0; i < 3; i++) {
+    await click("demo");
+    await click("analyze");
+    const t = $("#measurement-acquired");
+    t.value = `2026-09-15T00:0${i}:00Z`;
+    t.dispatchEvent(new Event("change", { bubbles: true }));
+    await click("save");
+    ids.push(Array.from(records.values()).at(-1).id);
+  }
+  for (const id of ids) {
+    const el = $(`[data-repeat-id="${id}"]`);
+    el.checked = true;
+    el.dispatchEvent(new Event("change", { bubbles: true }));
+  }
+  assert.equal($('[data-measure="analyze-repeats"]').disabled, true);
+  const v = $("#repeat-verified");
+  v.checked = true;
+  v.dispatchEvent(new Event("change", { bubbles: true }));
+  await click("analyze-repeats");
+  await tick();
+  assert.match(
+    $("#measurement-study").textContent,
+    /Spatial RMS of temporal SD/,
+  );
+  assert.match($("#measurement-study").textContent, /simulated data/);
+  assert.equal($('[data-measure="repeat-json"]').disabled, false);
+  const el = $(`[data-repeat-id="${ids[0]}"]`);
+  el.checked = false;
+  el.dispatchEvent(new Event("change", { bubbles: true }));
+  assert.equal($('[data-measure="repeat-json"]').disabled, true);
+  assert.equal($("#repeat-verified").checked, false);
+  assert.match($(".measurement-quality").textContent, /Measurement quality/);
+});
