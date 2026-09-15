@@ -60,3 +60,36 @@ export const archiveStore = {
   save: (a) => transact("readwrite", (s) => s.add(a), "archives"),
   remove: (id) => transact("readwrite", (s) => s.delete(id), "archives"),
 };
+
+// One transaction prevents partial project imports, including cross-store conflicts.
+export async function importProjectRecords(records) {
+  const db = await database();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(["runs", "archives"], "readwrite");
+    let failure;
+    tx.oncomplete = () => {
+      db.close();
+      resolve();
+    };
+    tx.onabort = tx.onerror = () => {
+      db.close();
+      reject(
+        failure || Error("Project import failed; no records were written."),
+      );
+    };
+    for (const r of records) {
+      const store = tx.objectStore(
+          r.format === "optibench-measurement" ? "runs" : "archives",
+        ),
+        req = store.get(r.id);
+      req.onsuccess = () => {
+        if (req.result) {
+          failure = Error(
+            "A record changed while importing. Retry after refreshing the navigator.",
+          );
+          tx.abort();
+        } else store.add(r);
+      };
+    }
+  });
+}

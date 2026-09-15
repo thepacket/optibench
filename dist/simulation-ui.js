@@ -183,6 +183,17 @@ export function createSimulationWorkspace({
             "Comparison complete. Review compatibility notes and differences below.";
           return;
         }
+        if (a === "comparison-save" && comparison) {
+          await store.save({
+            ...comparison,
+            id: crypto.randomUUID(),
+            title: "Sweep comparison",
+            createdAt: new Date().toISOString(),
+          });
+          message =
+            "Comparison saved in Projects with both source revision references.";
+          return;
+        }
         if (a === "comparison-json") {
           download(
             "optibench-study-comparison.json",
@@ -341,7 +352,7 @@ export function createSimulationWorkspace({
             `<option value="${esc(a.id)}" ${selected === a.id ? "selected" : ""}>${esc(a.title)} / ${esc(a.revisionName)} · ${esc(a.createdAt)}</option>`,
         )
         .join("");
-    return `<section class="validation-card"><h2>Compare saved studies</h2><div class="measurement-two"><label>Revision A<select data-compare="a">${options(compareA)}</select></label><label>Revision B<select data-compare="b">${options(compareB)}</select></label></div><div class="measurement-buttons"><button data-sim="compare" ${compareA && compareB && compareA !== compareB && !busy ? "" : "disabled"}>Recompute & compare</button><button data-sim="comparison-json" ${comparison && !busy ? "" : "disabled"}>Export comparison JSON</button><button data-sim="comparison-report" ${comparison && !busy ? "" : "disabled"}>Export comparison report</button></div>${comparisonHTML(comparison)}</section>`;
+    return `<section class="validation-card"><h2>Compare saved studies</h2><div class="measurement-two"><label>Revision A<select data-compare="a">${options(compareA)}</select></label><label>Revision B<select data-compare="b">${options(compareB)}</select></label></div><div class="measurement-buttons"><button data-sim="compare" ${compareA && compareB && compareA !== compareB && !busy ? "" : "disabled"}>Recompute & compare</button><button data-sim="comparison-save" ${comparison && !busy ? "" : "disabled"}>Save comparison to Projects</button><button data-sim="comparison-json" ${comparison && !busy ? "" : "disabled"}>Export comparison JSON</button><button data-sim="comparison-report" ${comparison && !busy ? "" : "disabled"}>Export comparison report</button></div>${comparisonHTML(comparison)}</section>`;
   }
   function historyHTML() {
     return `<section class="validation-card"><h2>Complete sweep archive</h2><p>${esc(archiveMessage)}</p><p>All points, including failures, are stored in one revision. These are synthetic simulation records. Export JSON for backup; revisions are local to this browser.</p><div class="measurement-two"><label>Experiment title<input data-revision="title" value="${esc(title)}" maxlength="120"></label><label>Revision name<input data-revision="name" value="${esc(revisionName)}" maxlength="120"></label></div><label>Revision notes<textarea data-revision="notes" maxlength="10000">${esc(revisionNotes)}</textarea></label><p>${parent ? "Next revision branches from " + esc(parent.revisionName) : "New sweep history"}</p><button data-sim="save-revision" ${study && !busy ? "" : "disabled"}>Save entire sweep revision</button>${verification ? `<h3>${esc(verification.summary)}</h3><p>Frame tolerance 10⁻¹² normalized intensity; map and scalar tolerance 10⁻⁷; mask and status must agree. Recomputed results are shown; saved revisions are not changed.</p><ul>${verification.checks.map((c) => `<li>Point ${c.index + 1} (${fmt(c.value)}): ${esc(c.status)} · ${esc(c.savedStatus)} → ${esc(c.recomputedStatus)}${c.savedError ? ` · archived: ${esc(c.savedError)}` : ""}</li>`).join("")}</ul>` : ""}<div class="measurement-table-scroll"><table><thead><tr><th>Experiment / revision</th><th>Saved</th><th>Points / failures</th><th>Notes</th><th>Actions</th></tr></thead><tbody>${entries.map((a) => `<tr><td>${esc(a.title)}<small>${esc(a.revisionName)}</small></td><td>${esc(a.createdAt)}</td><td>${a.study.rows.length} / ${a.study.rows.filter((r) => r.status === "failed").length}</td><td>${esc(a.revisionNotes)}</td><td><button data-sim="open-revision" data-id="${esc(a.id)}">Open & recompute</button><button data-sim="export-revision" data-id="${esc(a.id)}">Export</button></td></tr>`).join("")}</tbody></table></div></section>`;
@@ -366,6 +377,18 @@ export function createSimulationWorkspace({
     return `<svg viewBox="0 0 730 210" style="width:100%;max-width:900px;background:#111d29" role="img" aria-label="First-frame center intensity across sweep points"><path d="M40 20V175H690" fill="none" stroke="#789"/><path d="${d}" fill="none" stroke="#bdf18b" stroke-width="2"/><text x="40" y="198" fill="#dce7ee">${fmt(study.rows[0].value)} → ${fmt(study.rows.at(-1).value)} · first-frame center intensity (0–1)</text></svg>`;
   }
   return {
+    async openRecord(record) {
+      this.open();
+      busy = true;
+      message = "Recomputing saved sweep…";
+      render();
+      try {
+        await restoreFile(record);
+      } finally {
+        busy = false;
+        render();
+      }
+    },
     open() {
       if (!workingProject) {
         workingProject = structuredClone(getProject());

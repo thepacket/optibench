@@ -184,3 +184,7 @@ Tests reproduce identical saved revisions with zero metric deltas, verify source
 ## Alignment search and tolerance studies
 
 Tests exercise a known analytic objective with an optimum at +0.01 degrees, verify search bounds and deterministic uniform trial offsets, retain failed trials in the denominator, reject duplicate axes and locked mirrors, enforce stage travel, and run the real Michelson reconstruction and optimizer. UI tests restore archived inputs without applying a cached proposal. These establish implementation behavior under declared models; they do not validate a physical tolerance distribution, global convergence or manufacturing yield.
+
+## Project navigation and backups
+
+Tests verify transitive parent inclusion, immutable project snapshots and revision links, full source-frame retention, unique sweep provenance resolution, missing-parent reporting, idempotent import planning, conflict/duplicate rejection, and component/date/notes search. An emulated navigator test selects records, saves a project revision and dispatches restoration. Imports validate record inputs before a single cross-store IndexedDB transaction; reconstruction remains an explicit action in the corresponding analysis workspace. No physical validation is inferred from successful backup or restore.

@@ -69,6 +69,15 @@ export function createAlignmentStudyWorkspace({
       "Inputs restored. Run again to regenerate the proposal and trial results.";
   }
   return {
+    async openRecord(record) {
+      await this.open(
+        record.baseProject,
+        record.config.detectorId,
+        record.parentRevisionId,
+      );
+      restore(record);
+      render();
+    },
     async open(project, detectorId, parentRevisionId) {
       base = structuredClone(project);
       const m = base.items.find(
@@ -178,7 +187,12 @@ export function createAlignmentStudyWorkspace({
                 "Evidence saved locally. Export a backup for portability.";
             }
             if (a === "apply" && result) {
-              onApply(result.baseProject, result.proposedProject);
+              const applied = await onApply(
+                result.baseProject,
+                result.proposedProject,
+                result,
+              );
+              if (applied?.evidenceSaved) saved = true;
               message =
                 "Proposal applied. Return to the optical bench and use Undo to revert.";
             }

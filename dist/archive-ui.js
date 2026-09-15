@@ -167,5 +167,5 @@ export function createArchivePanel({
       }
     };
   }
-  return { render, refresh };
+  return { render, refresh, open };
 }

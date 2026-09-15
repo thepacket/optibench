@@ -1028,6 +1028,14 @@ export function createMetrologyWorkspace({
   }
   return {
     open,
+    async openRecord(record) {
+      open();
+      await loadRecord(record);
+    },
+    async openArchive(record) {
+      open();
+      await archivePanel.open(record);
+    },
     async importSimulationRuns(records) {
       if (busy || importing)
         throw Error("Wait for the measurement workspace to finish.");

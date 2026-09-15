@@ -1,3 +1,6 @@
+import { createProjectNavigator } from "./project-navigator-ui.js";
+import { createLayout } from "./project-navigator.js";
+import { archiveStore } from "./run-store.js";
 import { createAlignmentStudyWorkspace } from "./alignment-study-ui.js";
 import { createSimulationWorkspace } from "./simulation-ui.js";
 import { createValidationCenter } from "./validation-ui.js";
@@ -200,6 +203,7 @@ function mount() {
   $("#app").innerHTML =
     `<header class="app-header"><a class="brand" href="#" aria-label="OptiBench">${icon("lens", 31)}<strong>opti<span>bench</span></strong><small>LAB</small></a><div class="project-heading">${icon("folder")}<button data-action="project">${esc(project.title)}</button><span class="local-badge">LOCAL PROJECT</span></div><div class="top-actions">${button("open", "Open", "folder")}${button("save", "Save file", "save", "outline")}${iconButton("guide", "Model documentation & keyboard shortcuts", "book")}</div></header><div class="app-layout"><nav class="rail" aria-label="Workspace navigation">${[
       ["bench", "table", "Bench"],
+      ["projects", "folder", "Projects"],
       ["library", "lens", "Catalog"],
       ["templates", "book", "Setups"],
       ["design", "bolt", "Design"],
@@ -1487,6 +1491,9 @@ function handleClick(e) {
     case "validation":
       validationCenter.open();
       break;
+    case "projects":
+      projectNavigator.open();
+      break;
     case "simulation-runs":
       simulationWorkspace.open();
       break;
@@ -2392,15 +2399,26 @@ const measurementWorkspace = createMetrologyWorkspace({
   },
 });
 const alignmentStudyWorkspace = createAlignmentStudyWorkspace({
-  onApply: (base, proposal) => {
+  onApply: async (base, proposal, evidence) => {
     if (JSON.stringify(project) !== JSON.stringify(base))
       throw Error(
         "The active bench differs from this study. Start a new study using the current bench before applying adjustments.",
       );
+    const layout = createLayout(
+      proposal,
+      proposal.title + " · applied alignment",
+      "Applied from alignment study " + evidence.id,
+      evidence.id,
+    );
+    const saved = await archiveStore.list();
+    if (!saved.some((r) => r.id === evidence.id))
+      await archiveStore.save(evidence);
+    await archiveStore.save(layout);
     history.push(snapshot());
     redo = [];
     project = validateProject(structuredClone(proposal));
     commit();
+    return { evidenceSaved: true };
   },
 });
 const simulationWorkspace = createSimulationWorkspace({
@@ -2409,6 +2427,46 @@ const simulationWorkspace = createSimulationWorkspace({
   getProject: () => structuredClone(project),
   getDetector: () => activeDetector,
   onImport: (records) => measurementWorkspace.importSimulationRuns(records),
+});
+const projectNavigator = createProjectNavigator({
+  getProject: () => structuredClone(project),
+  onOpen: async (r, records) => {
+    if (r.format === "optibench-layout") {
+      checkpoint();
+      setProject(r.project);
+      document.querySelector("#app").inert = false;
+      return;
+    }
+    if (r.format === "optibench-measurement")
+      return measurementWorkspace.openRecord(r);
+    if (r.format === "optibench-experiment")
+      return measurementWorkspace.openArchive(r);
+    if (r.format === "optibench-sweep-archive")
+      return simulationWorkspace.openRecord(r);
+    if (r.format === "optibench-alignment-study")
+      return alignmentStudyWorkspace.openRecord(r);
+    if (r.format === "optibench-study-comparison") {
+      const left = records.find((x) => x.id === r.a.id),
+        right = records.find((x) => x.id === r.b.id);
+      if (!left || !right)
+        throw Error(
+          "Both source sweep revisions must be available to recompute this comparison. Import their project backup first.",
+        );
+      const w = new Worker(new URL("./simulation-worker.js", import.meta.url), {
+        type: "module",
+      });
+      try {
+        return await new Promise((resolve, reject) => {
+          w.onmessage = ({ data }) =>
+            data.error ? reject(Error(data.error)) : resolve(data.result);
+          w.onerror = () => reject(Error("Comparison worker failed."));
+          w.postMessage({ operation: "compare", left, right });
+        });
+      } finally {
+        w.terminate();
+      }
+    }
+  },
 });
 mount();
 if (document.modelContext?.registerTool) {
