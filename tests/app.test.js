@@ -266,3 +266,29 @@ test("interferometry setup, piston controls, phase scan and persistence", () => 
   click('[data-template="mach-zehnder"]');
   assert.match(el("#fringe-quality").textContent, /Valid row fit/);
 });
+
+test("measurement workspace captures the current interferometer without editing its layout", () => {
+  const before = JSON.stringify(read().project);
+  // The emulated canvas supports the ROI overlay used by the measurement viewer.
+  window.HTMLCanvasElement.prototype.getContext = function () {
+    return {
+      createImageData: (w, h) => ({ data: new Uint8ClampedArray(w * h * 4) }),
+      putImageData() {},
+      strokeRect() {},
+    };
+  };
+  click('[data-action="measurements"]');
+  click('[data-measure="capture"]');
+  assert.equal(
+    document.querySelectorAll(".measurement-frame-list>div").length,
+    4,
+  );
+  assert.match(el("#measurement-status").textContent, /simulated linear data/);
+  assert.equal(JSON.stringify(read().project), before);
+  window.dispatchEvent(
+    new KeyboardEvent("keydown", { key: "Delete", bubbles: true }),
+  );
+  assert.equal(JSON.stringify(read().project), before);
+  click('[data-measure="close"]');
+  assert.equal(el("#measurement-workspace").hidden, true);
+});

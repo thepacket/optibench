@@ -2302,3 +2302,394 @@ dialog::backdrop {
 .interferometry-layout .detector-image-wrap {
   align-self: start;
 }
+
+/* Dedicated metrology workspace. */
+#measurement-workspace {
+  position: fixed;
+  inset: 0;
+  z-index: 120;
+  background: #111923;
+  color: #dbe5ec;
+  overflow: auto;
+  font:
+    14px/1.5 Inter,
+    system-ui,
+    sans-serif;
+}
+#measurement-workspace[hidden] {
+  display: none;
+}
+#measurement-workspace * {
+  box-sizing: border-box;
+}
+#measurement-workspace button,
+#measurement-workspace input,
+#measurement-workspace select,
+#measurement-workspace textarea {
+  font: inherit;
+}
+#measurement-workspace button {
+  min-height: 36px;
+  padding: 7px 12px;
+  border: 1px solid #405163;
+  border-radius: 5px;
+  background: #263341;
+  color: #e0e9ef;
+  cursor: pointer;
+}
+#measurement-workspace button:hover {
+  border-color: #b8e88b;
+}
+#measurement-workspace button:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+#measurement-workspace button:focus-visible,
+#measurement-workspace input:focus-visible,
+#measurement-workspace select:focus-visible {
+  outline: 2px solid #b8e88b;
+  outline-offset: 2px;
+}
+#measurement-workspace .measurement-primary {
+  background: #b9e88f;
+  color: #18221b;
+  border-color: #b9e88f;
+  font-weight: 650;
+}
+.measurement-header {
+  display: flex;
+  gap: 16px;
+  align-items: center;
+  padding: 15px 24px;
+  border-bottom: 1px solid #344454;
+  background: #1b2632;
+}
+.measurement-header > div {
+  flex: 1;
+}
+#measurement-workspace h1 {
+  font-size: 23px;
+  margin: 0;
+  line-height: 1.4;
+}
+.measurement-kicker {
+  font-size: 12px;
+  color: #a3b3c2;
+  letter-spacing: 0.12em;
+}
+#measurement-workspace h2 {
+  font-size: 16px;
+  margin: 0 0 12px;
+}
+.measurement-grid {
+  display: grid;
+  grid-template-columns: 300px minmax(0, 1fr);
+}
+.measurement-controls {
+  padding: 20px;
+  border-right: 1px solid #344454;
+  background: #18222d;
+}
+.measurement-controls section + section {
+  margin-top: 24px;
+  padding-top: 22px;
+  border-top: 1px solid #344454;
+}
+#measurement-workspace label {
+  display: grid;
+  gap: 6px;
+  margin-bottom: 12px;
+  color: #bdcbd7;
+}
+#measurement-workspace input:not([type="checkbox"]),
+#measurement-workspace select,
+#measurement-workspace textarea {
+  width: 100%;
+  min-width: 0;
+  background: #101923;
+  color: #e3edf5;
+  padding: 8px 10px;
+  border: 1px solid #415263;
+  border-radius: 4px;
+}
+#measurement-workspace input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  accent-color: #b9e88f;
+}
+.measurement-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 12px 0;
+}
+.measurement-help {
+  color: #a4b5c4;
+  font-size: 12px;
+  line-height: 1.6;
+}
+.measurement-frame-list > div {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 10px 0;
+}
+.measurement-frame-list b {
+  width: 34px;
+  color: #b9e88f;
+}
+.measurement-frame-list span {
+  min-width: 0;
+  flex: 1;
+  overflow-wrap: anywhere;
+}
+.measurement-frame-list small,
+#measurement-runs small {
+  display: block;
+  color: #91a5b7;
+  font-size: 12px;
+}
+.measurement-two {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+#measurement-workspace .measurement-check {
+  display: flex;
+  gap: 9px;
+  align-items: center;
+}
+.measurement-analyze {
+  width: 100%;
+}
+.measurement-main {
+  min-width: 0;
+  padding: 24px;
+  max-width: 1500px;
+  width: 100%;
+  margin: auto;
+}
+.measurement-title {
+  display: flex;
+  gap: 20px;
+  align-items: center;
+}
+.measurement-title > label {
+  flex: 1;
+  max-width: 650px;
+}
+#measurement-name {
+  font-size: 18px !important;
+}
+.measurement-badge {
+  color: #b9e88f;
+  border: 1px solid #496442;
+  border-radius: 4px;
+  padding: 5px 10px;
+}
+.measurement-status {
+  padding: 10px 14px;
+  background: #20303d;
+  border-left: 3px solid #95bacc;
+  margin: 10px 0 20px;
+}
+.measurement-instruments {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+}
+.measurement-instruments article {
+  min-width: 0;
+  padding: 16px;
+  background: #1a2531;
+  border: 1px solid #344454;
+  border-radius: 6px;
+}
+.measurement-instruments header,
+.measurement-records header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+.measurement-instruments header h2 {
+  margin: 0 !important;
+}
+.measurement-instruments select {
+  max-width: 160px;
+}
+.measurement-instruments canvas {
+  display: block;
+  width: 100%;
+  aspect-ratio: 1;
+  object-fit: contain;
+  background: #0b1119;
+  image-rendering: auto;
+}
+.measurement-instruments p {
+  font-size: 12px;
+  color: #a7bacb;
+  margin: 10px 0 0;
+}
+.measurement-metrics {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 14px;
+  margin: 20px 0;
+}
+.measurement-metrics > div {
+  padding: 16px;
+  background: #1c2a36;
+  border-top: 2px solid #779a63;
+}
+.measurement-metrics span {
+  display: block;
+  color: #acc0cf;
+}
+.measurement-metrics strong {
+  display: block;
+  font-size: 25px;
+  font-weight: 550;
+}
+.measurement-metrics small {
+  font-size: 14px;
+}
+.measurement-diagnostics {
+  padding: 0 4px;
+}
+.measurement-diagnostics p {
+  margin: 7px 0;
+}
+.measurement-warning {
+  color: #edc793;
+}
+.measurement-empty {
+  padding: 22px;
+  color: #a7bacb;
+  text-align: center;
+}
+.measurement-notes {
+  margin-top: 24px;
+}
+.measurement-records {
+  margin-top: 30px;
+  padding-top: 24px;
+  border-top: 1px solid #344454;
+}
+.measurement-records header > span {
+  font-size: 12px;
+  color: #9fb3c4;
+}
+.measurement-table-scroll {
+  overflow: auto;
+}
+#measurement-workspace table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+}
+#measurement-workspace th,
+#measurement-workspace td {
+  text-align: left;
+  padding: 10px;
+  border-bottom: 1px solid #344454;
+}
+#measurement-comparison {
+  padding: 12px;
+  background: #20303d;
+  margin-top: 12px;
+}
+.measurement-model {
+  margin: 24px 0;
+  color: #aabfce;
+}
+.measurement-model summary {
+  cursor: pointer;
+  color: #dce6ed;
+  font-weight: 600;
+}
+.measurement-model a {
+  color: #b9e88f;
+}
+@media (max-width: 1100px) {
+  .measurement-grid {
+    grid-template-columns: 260px minmax(0, 1fr);
+  }
+  .measurement-main {
+    padding: 16px;
+  }
+  .measurement-metrics {
+    grid-template-columns: 1fr 1fr;
+  }
+  .measurement-instruments {
+    gap: 10px;
+  }
+  .measurement-instruments header {
+    display: block;
+  }
+  .measurement-instruments header select {
+    margin-top: 8px;
+  }
+  .measurement-header {
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+  .measurement-title {
+    display: block;
+  }
+  .measurement-badge {
+    display: inline-block;
+    margin-bottom: 8px;
+  }
+}
+@media (max-width: 740px) {
+  .measurement-grid {
+    display: flex;
+    flex-direction: column;
+  }
+  .measurement-controls {
+    border-right: 0;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 18px;
+  }
+  .measurement-controls section + section {
+    margin: 0;
+    padding: 0;
+    border: 0;
+  }
+  .measurement-main {
+    padding: 16px;
+  }
+  .measurement-header > div {
+    min-width: 160px;
+  }
+  .measurement-instruments {
+    grid-template-columns: 1fr 1fr;
+  }
+  .measurement-records header {
+    display: block;
+  }
+}
+@media (max-width: 480px) {
+  .measurement-controls {
+    grid-template-columns: 1fr;
+  }
+  .measurement-controls section + section {
+    border-top: 1px solid #344454;
+    padding-top: 18px;
+  }
+  .measurement-instruments {
+    grid-template-columns: 1fr;
+  }
+  .measurement-metrics {
+    gap: 8px;
+  }
+  .measurement-metrics strong {
+    font-size: 21px;
+  }
+  .measurement-header {
+    padding: 12px;
+  }
+}

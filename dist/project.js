@@ -1,5 +1,5 @@
 import { catalog, instantiate } from "./catalog.js";
-export const ENGINE_VERSION = "0.3.0";
+export const ENGINE_VERSION = "0.4.0";
 export const DEFAULT_TABLE = {
   width: 1500,
   height: 900,

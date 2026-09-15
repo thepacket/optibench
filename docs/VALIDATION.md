@@ -1,4 +1,4 @@
-# Model validation — OptiBench 0.3.0
+# Model validation — OptiBench 0.4.0
 
 ## Units and conventions
 
@@ -93,3 +93,29 @@ Regression checks establish:
 - Application workflow from template selection through piston adjustment, phase scan, undo, solver persistence and switching.
 
 Physical phase and visibility relationships: [UCSB Michelson demonstration](https://web.physics.ucsb.edu/~lecturedemonstrations/Composer/Pages/84%5B1%5D.30a.html). These checks validate the stated ideal model; they do not establish agreement with a calibrated physical instrument.
+
+
+## Image-based measurement workspace (0.4.0; metrology engine 1.0.0)
+
+### Input and reconstruction
+
+- Opaque PNG, JPEG and WebP files are decoded by the browser into 8-bit luminance without resizing. Native frame dimensions are limited to 64–2048 pixels per side; each input file is limited to 32 MB. A square, native-pixel ROI may be 64, 128, 256 or 512 pixels across. Camera RAW, TIFF, higher-bit-depth preservation, radiometric linearization and frame registration are not supplied. Use aligned, linear monochrome camera exports.
+- Four-step frames must follow increasing phase 0°, 90°, 180°, 270°, with constant exposure. Filename order initializes the sequence; arrow controls allow reordering. The estimator is atan2(I270−I90, I0−I180), with modulation amplitude hypot(I0−I180,I270−I90)/2. Opposing-pair intensity sums provide a consistency diagnostic, not a complete phase-step calibration.
+- Optional corrections use (signal−dark)/(flat−dark); without a flat the denominator is one. Calibration frames must match the signals' dimensions. Clipped signal samples, invalid flat responses and insufficient visibility are excluded.
+- Single-image reconstruction uses a two-dimensional Hann window, a selected Fourier sideband and a circular filter with a flat inner 70% and cosine-tapered outer 30%. Automatic selection searches the positive half-plane; manual signed frequency bins can select the conjugate. Filtering changes spatial bandwidth, so repeat with different ROI/filter choices. Visibility is approximate for this method. The outer 10% and low window/amplitude support are excluded. A separated spatial carrier and slowly varying phase are required.
+- Quality-guided connected-region unwrapping retains the region containing the strongest modulation sample. Disconnected regions have no established common fringe order and are excluded. Inconsistent unwrap edges generate diagnostics. Neighbouring true phase increments must remain below π; the algorithm cannot prove this from wrapped data.
+- The retained phase has either its mean or its best-fit plane removed. OPD is λφ/(2π); reflecting-surface height is λφ/(4π cos θ). Sample-plane pixel scale controls lateral coordinates. Absolute distance, absolute fringe order, sample registration and physical sign for a single conjugate sideband are not established. PV/RMS describe the masked relative map and are not confidence intervals.
+
+### Reproducibility and storage
+
+Named experiments retain decoded full-frame samples, calibration frames, ROI and conversion settings, notes, associated bench snapshot, engine version, maps and statistics. Browser IndexedDB stores independent records; new saves do not mutate earlier runs. JSON export includes these data, with invalid map samples represented as null. Loading a saved run recomputes from retained inputs using the current engine; the source JSON keeps its original results. Two-run summary comparison flags different settings. No claim of aligned map subtraction is made.
+
+The simulation capture creates normalized ideal irradiance at known phase offsets, with a disclosed positive offset and common scale; it is not an acquired camera signal. Imported data and synthetic data have distinct visible provenance. Standalone HTML reports contain the currently selected map, units, settings, statistics, diagnostics, frame names and notes. CSV contains per-pixel coordinates, masks, phase, relative nm and visibility.
+
+### Verification
+
+Numerical regressions recover a known multi-wrap four-step wavefront to 10⁻⁸ rad, recover its visibility, verify the two-dimensional Fourier carrier and recover a smooth synthetic phase to <0.03 rad RMS over the retained region. Tests also establish conjugate phase-sign reversal, dark/flat correction, reflection/incidence conversion, native ROI coordinates, clipping masks, phase-step inconsistency warnings, disconnected-region exclusion and reproducibility after JSON serialization.
+
+Emulated application tests cover image decoding/import order, reconstruction, calibration edits invalidating results, immutable saved runs, run restoration/comparison, simulated bench capture, keyboard isolation and CSV/JSON/report contents. They do not replace physical instrument validation or browser rendering tests. IndexedDB uses the browser transaction API and surfaces storage failures rather than claiming a save succeeded.
+
+References: [Takeda, Ina and Kobayashi, Fourier-transform method of fringe-pattern analysis (1982)](https://opg.optica.org/josa/abstract.cfm?uri=josa-72-1-156); [GRAVITY metrology: four-step phase-shifting concept and calibration (2015)](https://arxiv.org/abs/1501.04738).

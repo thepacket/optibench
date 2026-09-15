@@ -13,6 +13,12 @@ npm start
 
 Open the local server at `http://localhost:5173`. Runtime code has no npm dependencies. `happy-dom` and `prettier` are development tools only. Hosted output is the authored `dist/` directory; `.openai/hosting.json` preserves the existing private Sites project.
 
+## Measurement workflow
+
+Choose **Measure** in the app rail. Import a single spatial-carrier image or four frames ordered 0°, 90°, 180°, 270°. The workbench accepts opaque PNG/JPEG/WebP decoded to 8-bit luminance at native resolution, with optional dark and flat frames. Set a square ROI, sample-plane pixel calibration, wavelength and OPD/reflection geometry; reconstruct phase, inspect masks and diagnostics, then save a named experiment.
+
+Runs are stored locally in IndexedDB. Export run JSON for portable backup; it contains all decoded signal/calibration samples, settings, the associated bench snapshot and results. Pixel maps export as CSV and reports as printable standalone HTML. Keep original camera files separately. The app provides analysis, not hardware acquisition or a calibrated uncertainty certificate.
+
 ## Included capabilities
 
 - 291 inventory entries: 154 sourced manufacturer references and 137 parametric design entries. Manufacturer families include Thorlabs, Edmund Optics and Newport. Source links, lookup date, legacy status and assumptions travel with the catalog.

@@ -1,3 +1,4 @@
+import { createMetrologyWorkspace } from "./metrology-ui.js";
 import { catalog, categories, sources, instantiate } from "./catalog.js";
 import {
   makeProject,
@@ -190,6 +191,7 @@ function mount() {
       ["templates", "book", "Setups"],
       ["design", "bolt", "Design"],
       ["analysis", "chart", "Analysis"],
+      ["measurements", "camera", "Measure"],
       ["bom", "parts", "Parts"],
     ]
       .map(([a, i, t]) => button(a, t, i, a === "bench" ? "active" : ""))
@@ -1100,6 +1102,7 @@ function bind() {
     if (part) placePart(part, snapPoint(worldPoint(e)));
   });
   window.addEventListener("keydown", (e) => {
+    if (document.querySelector("#measurement-workspace:not([hidden])")) return;
     const editing = ["INPUT", "TEXTAREA", "SELECT"].includes(
       document.activeElement.tagName,
     );
@@ -1317,6 +1320,9 @@ function handleClick(e) {
     return;
   }
   switch (a) {
+    case "measurements":
+      measurementWorkspace.open();
+      break;
     case "bench":
       openDrawer("");
       fit();
@@ -2115,6 +2121,51 @@ try {
         catalog.unshift({ ...valid, id, brand: "Custom", provenance: "ideal" });
     }
 } catch {}
+const measurementWorkspace = createMetrologyWorkspace({
+  getProject: () => structuredClone(project),
+  capture: (method) => {
+    const field = coherentField(project, activeDetector);
+    if (field.paths.length !== 2)
+      throw Error(
+        "Open a two-arm interferometer and select its fringe detector before capturing.",
+      );
+    const n = 256,
+      width =
+        field.detector.type === "camera"
+          ? (Math.min(field.detector.pixelsX, field.detector.pixelsY) *
+              field.detector.pixelPitch) /
+            1000
+          : field.width;
+    const frames = Array.from(
+      { length: method === "four-step" ? 4 : 1 },
+      (_, j) => ({
+        name: `Simulated ${j * 90}°`,
+        width: n,
+        height: n,
+        origin: "Simulated linear irradiance",
+        values: Float64Array.from(
+          { length: n * n },
+          (_, i) =>
+            field.at(
+              (((i % n) + 0.5 - n / 2) * width) / n,
+              ((Math.floor(i / n) + 0.5 - n / 2) * width) / n,
+              (j * Math.PI) / 2,
+            ).intensity,
+        ),
+      }),
+    );
+    let max = 0;
+    for (const f of frames) for (const v of f.values) max = Math.max(max, v);
+    if (max <= 0) throw Error("No simulated intensity reaches this detector.");
+    for (const f of frames)
+      f.values = Float64Array.from(f.values, (v) => 0.02 + (0.9 * v) / max);
+    return {
+      frames,
+      pixelUm: (width / n) * 1000,
+      wavelength: field.wavelength,
+    };
+  },
+});
 mount();
 if (document.modelContext?.registerTool) {
   const lifecycle = new AbortController();
