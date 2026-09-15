@@ -204,3 +204,7 @@ Acceptance tests cover inclusive boundaries, known failures with missing evidenc
 ## v0.18 guided Michelson experiment
 
 A full workflow test verifies nine completed acquisitions, a nonconstant center intensity returning to its initial value after one piston cycle, a freshly recomputed acceptance result with nine sampling checks, unchanged source inputs and a valid 13-record project backup with no missing references. A UI test checks step gating and explicit, reversible bench loading. No physical equipment validation is implied.
+
+## v0.19 alignment practice
+
+Tests verify the challenge starts below the practice targets, reference correction improves visibility, usable area and beam separation, and source inputs remain unchanged. Both evidence archives and layouts round-trip through project backup validation. Invalid offsets reject, failed results cannot export as valid comparisons, and deterioration/recovery hints are exercised. This remains a synthetic scalar paraxial model.

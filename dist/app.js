@@ -1,3 +1,4 @@
+import { createPracticeWorkspace } from "./alignment-practice-ui.js";
 import { createGuidedWorkspace } from "./guided-ui.js";
 import { createAcceptanceWorkspace } from "./acceptance-ui.js";
 import { TaskWorker } from "./task-worker.js";
@@ -208,6 +209,7 @@ function mount() {
       ["bench", "table", "Bench"],
       ["projects", "folder", "Projects"],
       ["first-experiment", "play", "First lab"],
+      ["alignment-practice", "target", "Practice"],
       ["library", "lens", "Catalog"],
       ["templates", "book", "Setups"],
       ["design", "bolt", "Design"],
@@ -1495,6 +1497,9 @@ function handleClick(e) {
     case "validation":
       validationCenter.open();
       break;
+    case "alignment-practice":
+      practiceWorkspace.open();
+      break;
     case "first-experiment":
       guidedWorkspace.open();
       break;
@@ -2435,6 +2440,7 @@ const simulationWorkspace = createSimulationWorkspace({
   getDetector: () => activeDetector,
   onImport: (records) => measurementWorkspace.importSimulationRuns(records),
 });
+const practiceWorkspace = createPracticeWorkspace({onBench: p => {checkpoint(); setProject(p);}});
 const guidedWorkspace = createGuidedWorkspace({
   onBench: p => { checkpoint(); setProject(p); },
   onMeasure: r => measurementWorkspace.openRecord(r),
