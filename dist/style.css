@@ -2889,3 +2889,5 @@ dialog::backdrop {
 .app-layout[data-focus="detector"] .bench-stage,.app-layout[data-focus="detector"] #results-splitter,.app-layout[data-focus="detector"] .workspace-heading,.app-layout[data-focus="detector"] .workbar{display:none;}
 .app-layout[data-focus="detector"] .results-panel{flex:1 1 0;height:auto;min-height:180px;}
 @media(max-width:600px){.workspace-layout-tools{gap:5px;padding:6px}.workspace-layout-tools button,.workspace-layout-tools select{font-size:13px;min-height:32px}.layout-status:empty{display:none;}}
+
+#validation-center pre{white-space:pre-wrap;overflow-wrap:anywhere}#validation-center .validation-card table{width:100%;border-collapse:collapse}#validation-center .validation-card td,#validation-center .validation-card th{padding:10px;text-align:left;border-bottom:1px solid #3b4f61}

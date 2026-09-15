@@ -212,3 +212,7 @@ Tests verify the challenge starts below the practice targets, reference correcti
 ## Adjustable workspace verification
 
 Tests cover independent layout profile saves, reset, maximize state, invalid saved dimensions, and integration with the bounded results divider. Browser checks verified both side dividers, profile selection/save/reset, and bench/detector maximization. Effective CSS viewports of 1440×900 and 600×500 were checked under the in-app browser's existing display scaling; compact controls fit without horizontal toolbar overflow and the workspace scrolls when height is constrained. Browser zoom keyboard shortcuts did not change the in-app viewport, so a separate 200% browser-zoom setting was not verified.
+
+## Scientific dashboard checks
+
+Added end-to-end optical fixtures for Gaussian free-space radius, 13-ray thin-lens focusing, and Malus-law transmission. Tests verify expected/computed error limits, three sampling grids and saved sampling layout, incomplete/failed summary states, and escaped report content. Optical fixtures and sampling run in the existing cancellable validation worker. Run all clears previous results before starting, so cancellation leaves incomplete current evidence rather than a mixed historical success.

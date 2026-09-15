@@ -187,3 +187,9 @@ Save the comparison project or export a Projects-compatible backup with both ben
 Use the **Workspace** controls above the bench to select Design, Alignment or Measurement. Resize inventory and inspector by dragging their inner edges or using Left/Right arrows on the focused divider. The detector divider still supports dragging and Up/Down keys. **Save layout** stores the current sizes in the selected profile; **Reset layout** restores that profile's defaults. Preferences are local to this browser and separate from optical project data.
 
 **Maximize bench** and **Maximize detector** temporarily hide surrounding panels; the same button restores the workspace. At narrow widths, side panels use the existing Catalog/Inspector drawers instead of dividers. Preferred widths are constrained to preserve working space, and controls wrap at small sizes. Maximized mode is temporary and is not restored on reload.
+
+## Scientific validation dashboard
+
+In **Validate → Run all benchmarks**, the dashboard now combines phase reconstruction/fault benchmarks with optical checks for free-space Gaussian radius, ideal thin-lens ray focusing and Malus-law transmission. Each optical case reports its analytical expectation, computed value, absolute error, tolerance and exact fixture. A fixed Michelson setup is separately sampled at 64², 128² and 256²; successive differences show numerical sensitivity without claiming convergence.
+
+The summary distinguishes failed checks from incomplete evidence. Solver support and limitations, analytical/synthetic provenance, and the lack of qualified laboratory data are visible in the dashboard and HTML report. JSON export also retains scientific results, layouts and summary. Imported frames or historical baselines do not become qualified experimental validation merely by importing them. Optical checks test named ideal cases, not all possible configurations.

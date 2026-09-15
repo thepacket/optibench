@@ -1,3 +1,9 @@
+import {
+  runScientificValidation,
+  scientificHTML,
+  coverageHTML,
+  validationSummary,
+} from "./scientific-validation.js";
 import { showWorkspace, closeWorkspace } from "./workspace-state.js";
 import { TaskWorker } from "./task-worker.js";
 import {
@@ -55,7 +61,17 @@ export function createValidationCenter() {
     results = [],
     busy = false,
     message = "",
-    baseline = null;
+    baseline = null,
+    scientific = null;
+  const reportData = () => ({
+    ...validationReport(results),
+    scientific,
+    summary: validationSummary(results, benchmarks.length, scientific),
+  });
+  const summaryHTML = () => {
+    const s = reportData().summary;
+    return `<section class="validation-card"><h2>${s.status}</h2><p>Reconstruction: ${s.reconstructionPassed} passed · ${s.reconstructionFailed} failed · ${s.reconstructionNotRun} not run. Optical checks: ${s.opticalPassed} passed · ${s.opticalFailed} failed. Sampling: ${s.samplingComplete ? "three grids evaluated" : "incomplete"}.</p><p>Qualified laboratory datasets: 0. Passing named checks does not certify the full application or an instrument.</p></section>`;
+  };
   function cards() {
     return benchmarks
       .map((b) => {
@@ -66,7 +82,7 @@ export function createValidationCenter() {
       .join("");
   }
   function render() {
-    root.innerHTML = `<header class="measurement-header"><button data-validation="close">← Optical bench</button><div><span class="measurement-kicker">OPTIBENCH / VALIDATION</span><h1>Validation Center</h1></div><button data-validation="all" ${busy ? "disabled" : ""}>${busy ? "Running…" : "Run all benchmarks"}</button><button data-validation="baseline">Open baseline JSON</button><button data-validation="json" ${results.length && !busy ? "" : "disabled"}>Export JSON</button><button data-validation="report" ${results.length && !busy ? "" : "disabled"}>Export report</button></header><main class="validation-main"><p role="status">${esc(message || "Run deterministic known-answer experiments without laboratory equipment.")}</p><p>Evidence: analytical and synthetic. These cases test the phase-measurement engine and fault diagnostics; they do not certify real-instrument accuracy or the complete optical solver. Accuracy requires RMS error within the stated bound, >99% valid area and zero unwrap conflicts.</p><div class="validation-cards">${cards()}</div><section class="validation-card"><h2>Published experimental data · candidates</h2><p><a href="https://zenodo.org/records/18440754" target="_blank" rel="noopener">Generalizable phase extraction in interferometry</a> includes ceramic/steel interferograms and analysis code. The archives are several gigabytes; phase ordering, calibration and reference values still need qualification. Not imported or counted as validation evidence.</p><p><a href="https://perso.ens-lyon.fr/ludovic.bellon/wp/2022/harmonic-calibration-of-quadrature-phase-interferometry/" target="_blank" rel="noopener">Harmonic calibration of quadrature phase interferometry</a> is a candidate for signal-calibration research, not a verified four-image spatial benchmark. Source review: 2026-09-15.</p><p>Admission requires raw intensity, documented phase sequence and wavelength, calibration, reference result with uncertainty, and reuse permission. No laboratory dataset is included in the current benchmark suite.</p></section></main><input id="validation-baseline" type="file" accept=".json" hidden>`;
+    root.innerHTML = `<header class="measurement-header"><button data-validation="close">← Optical bench</button><div><span class="measurement-kicker">OPTIBENCH / VALIDATION</span><h1>Validation Center</h1></div><button data-validation="all" ${busy ? "disabled" : ""}>${busy ? "Running…" : "Run all benchmarks"}</button><button data-validation="baseline">Open baseline JSON</button><button data-validation="json" ${(results.length || scientific) && !busy ? "" : "disabled"}>Export JSON</button><button data-validation="report" ${(results.length || scientific) && !busy ? "" : "disabled"}>Export report</button></header><main class="validation-main"><p role="status">${esc(message || "Run deterministic known-answer experiments without laboratory equipment.")}</p><p>Evidence: analytical and synthetic. These cases test the phase-measurement engine and fault diagnostics; they do not certify real-instrument accuracy or the complete optical solver. Accuracy requires RMS error within the stated bound, >99% valid area and zero unwrap conflicts.</p>${summaryHTML()}${scientificHTML(scientific)}<h2>Phase reconstruction and fault diagnostics</h2><div class="validation-cards">${cards()}</div>${coverageHTML()}<section class="validation-card"><h2>Published experimental data · candidates</h2><p><a href="https://zenodo.org/records/18440754" target="_blank" rel="noopener">Generalizable phase extraction in interferometry</a> includes ceramic/steel interferograms and analysis code. The archives are several gigabytes; phase ordering, calibration and reference values still need qualification. Not imported or counted as validation evidence.</p><p><a href="https://perso.ens-lyon.fr/ludovic.bellon/wp/2022/harmonic-calibration-of-quadrature-phase-interferometry/" target="_blank" rel="noopener">Harmonic calibration of quadrature phase interferometry</a> is a candidate for signal-calibration research, not a verified four-image spatial benchmark. Source review: 2026-09-15.</p><p>Admission requires raw intensity, documented phase sequence and wavelength, calibration, reference result with uncertainty, and reuse permission. No laboratory dataset is included in the current benchmark suite.</p></section></main><input id="validation-baseline" type="file" accept=".json" hidden>`;
     root.onclick = async (e) => {
       const b = e.target.closest("[data-validation]");
       if (!b) return;
@@ -80,13 +96,21 @@ export function createValidationCenter() {
       try {
         if (a === "all" || a === "run") {
           busy = true;
+          if (a === "all") {
+            results = [];
+            scientific = null;
+          }
           message = "Running known-answer reconstruction…";
           render();
           for (const id of a === "all"
-            ? benchmarks.map((b) => b.id)
+            ? ["optical-suite", ...benchmarks.map((b) => b.id)]
             : [b.dataset.id]) {
             let r;
-            if (typeof Worker === "undefined") r = runBenchmark(id);
+            if (typeof Worker === "undefined")
+              r =
+                id === "optical-suite"
+                  ? runScientificValidation()
+                  : runBenchmark(id);
             else {
               const w = new TaskWorker(
                 new URL("./validation-worker.js", import.meta.url),
@@ -105,21 +129,19 @@ export function createValidationCenter() {
                 w.terminate();
               }
             }
-            results = results.filter((v) => v.id !== id).concat(r);
+            if (id === "optical-suite") scientific = r;
+            else results = results.filter((v) => v.id !== id).concat(r);
             message = `${results.length} cases run · ${results.filter((r) => r.passed).length} passed.`;
             render();
           }
           busy = false;
           render();
         } else if (a === "json")
-          download(
-            "optibench-validation.json",
-            JSON.stringify(validationReport(results)),
-          );
+          download("optibench-validation.json", JSON.stringify(reportData()));
         else if (a === "report")
           download(
             "optibench-validation.html",
-            `<!doctype html><html lang="en"><meta charset="utf-8"><title>OptiBench validation</title><style>body{font:16px system-ui;max-width:1100px;margin:40px auto;padding:20px}article{border-bottom:1px solid #aaa;padding:20px}button{display:none}td,th{padding:8px}svg{max-width:700px}</style><h1>OptiBench validation report</h1><p>${esc(new Date().toISOString())} · suite ${validationReport(results).version} · engine ${validationReport(results).engine}</p><p>Analytical and synthetic evidence only. Diagnostic PASS means an injected fault was detected. Full-ROI expected PV/RMS differs from masked-region statistics in fault cases.</p>${cards()}</html>`,
+            `<!doctype html><html lang="en"><meta charset="utf-8"><title>OptiBench validation</title><style>body{font:16px system-ui;max-width:1100px;margin:40px auto;padding:20px}article{border-bottom:1px solid #aaa;padding:20px}button{display:none}td,th{padding:8px}svg{max-width:700px}pre{white-space:pre-wrap;overflow-wrap:anywhere}.data-scroll{overflow:auto}table{border-collapse:collapse;width:100%}</style><h1>OptiBench validation report</h1><p>${esc(new Date().toISOString())} · suite ${validationReport(results).version} · engine ${validationReport(results).engine}</p><p>Analytical and synthetic evidence only. Diagnostic PASS means an injected fault was detected. Full-ROI expected PV/RMS differs from masked-region statistics in fault cases.</p>${summaryHTML()}${scientificHTML(scientific)}${cards()}${coverageHTML()}</html>`,
             "text/html",
           );
         else if (a === "baseline") root.querySelector("input").click();
