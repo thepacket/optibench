@@ -834,7 +834,8 @@ p {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 14px 10px;
-  align-content: space-around;
+  align-content: start;
+  align-self: start;
 }
 .detector-metrics > div > span {
   font-size: 10px;
