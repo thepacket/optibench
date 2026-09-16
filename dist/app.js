@@ -1,3 +1,4 @@
+import { createImagingWorkspace } from './imaging-ui.js';
 import { createNonsequentialWorkspace } from './nonsequential-ui.js';
 import { createOptimizationWorkspace } from './optimization-ui.js';
 import { alignmentVerificationRunbook } from './optimization-runbook.js';
@@ -223,6 +224,7 @@ function mount() {
       ["runbook", "book", "Runbook"],
       ["optimize", "settings", "Optimize"],
       ["nonsequential", "grid", "Ray optics"],
+      ["imaging", "grid", "Imaging"],
       ["alignment-practice", "target", "Practice"],
       ["templates", "book", "Setups"],
       ["design", "bolt", "Design"],
@@ -1523,6 +1525,9 @@ function handleClick(e) {
     case "alignment-practice":
       practiceWorkspace.open();
       break;
+    case "imaging":
+      imagingWorkspace.open();
+      break;
     case "nonsequential":
       nonsequentialWorkspace.open();
       break;
@@ -2472,7 +2477,8 @@ const simulationWorkspace = createSimulationWorkspace({
   onImport: (records) => measurementWorkspace.importSimulationRuns(records),
 });
 const practiceWorkspace = createPracticeWorkspace({onBench: p => {checkpoint(); setProject(p);}});
-const nonsequentialWorkspace = createNonsequentialWorkspace({getProject:()=>structuredClone(project)});
+const imagingWorkspace = createImagingWorkspace();
+const nonsequentialWorkspace = createNonsequentialWorkspace({getProject:()=>structuredClone(project),onImaging:run=>imagingWorkspace.open(run)});
 const optimizationWorkspace = createOptimizationWorkspace({getProject:()=>structuredClone(project),onBench:p=>{checkpoint();setProject(p);},onRunbook:(p,run)=>runbookWorkspace.open(alignmentVerificationRunbook(run))});
 const runbookWorkspace = createRunbookWorkspace({onAlignment:p=>optimizationWorkspace.open(p),getProject:()=>structuredClone(project),onInspect:(kind,r)=>kind==="camera"?profilerWorkspace.openRecord(r):powerWorkspace.openRecord(r)});
 const profilerWorkspace = createProfilerWorkspace({getProject:()=>structuredClone(project),getDetector:()=>activeDetector,onDetector:id=>{activeDetector=id;renderResults();},onBench:p=>{checkpoint();setProject(p);}});

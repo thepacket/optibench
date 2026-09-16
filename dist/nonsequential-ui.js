@@ -55,6 +55,7 @@ export function createNonsequentialWorkspace({
   store = runbookStore,
   execute,
   executeStudy,
+  onImaging,
 } = {}) {
   let root,
     scene,
@@ -101,7 +102,7 @@ export function createNonsequentialWorkspace({
     } catch (e) {
       preview = `<p>${esc(e.message)} Correct the geometry to display the scene.</p>`;
     }
-    root.innerHTML = `<header class="measurement-header"><button data-ray="close" ${busy ? "disabled" : ""}>← Optical bench</button><h1>Non-sequential optics</h1><span>Geometrical rays · 3D surfaces</span></header><main class="instrument-main"><p role="status">${esc(message)}</p><div class="measurement-buttons"><button data-ray="capture" ${busy ? "disabled" : ""}>Capture bench</button>${["plate", "sphere", "lens", "coated", "absorption", "diffuse"].map((k) => `<button data-ray="example-${k}" ${busy ? "disabled" : ""}>${k === "plate" ? "Plate ghosts" : k === "sphere" ? "Ball lens" : k === "lens" ? "Biconvex lens" : k === "coated" ? "AR coating" : k === "absorption" ? "Absorbing glass" : "Diffuse reflector"}</button>`).join("")}<button data-ray="trace" ${busy ? "disabled" : ""}>Trace rays</button>${busy ? '<button data-ray="cancel">Cancel trace</button>' : ""}<button data-ray="benchmarks" ${busy ? "disabled" : ""}>Run physics checks</button><button data-ray="save-scene" ${busy ? "disabled" : ""}>Save scene</button><button data-ray="export-scene" ${busy ? "disabled" : ""}>Export scene JSON</button></div><div class="ray-layout"><section class="instrument-controls"><fieldset ${busy ? "disabled" : ""}><legend>Scene</legend><label>Name<input data-scene-name value="${esc(scene.name)}" maxlength="200"></label><div class="runbook-fields">${Object.entries(
+    root.innerHTML = `<header class="measurement-header"><button data-ray="close" ${busy ? "disabled" : ""}>← Optical bench</button><h1>Non-sequential optics</h1><span>Geometrical rays · 3D surfaces</span></header><main class="instrument-main"><p role="status">${esc(message)}</p><div class="measurement-buttons"><button data-ray="capture" ${busy ? "disabled" : ""}>Capture bench</button>${["plate", "sphere", "lens", "coated", "absorption", "diffuse"].map((k) => `<button data-ray="example-${k}" ${busy ? "disabled" : ""}>${k === "plate" ? "Plate ghosts" : k === "sphere" ? "Ball lens" : k === "lens" ? "Biconvex lens" : k === "coated" ? "AR coating" : k === "absorption" ? "Absorbing glass" : "Diffuse reflector"}</button>`).join("")}<button data-ray="imaging" ${busy || !run ? "disabled" : ""}>Imaging analysis</button><button data-ray="trace" ${busy ? "disabled" : ""}>Trace rays</button>${busy ? '<button data-ray="cancel">Cancel trace</button>' : ""}<button data-ray="benchmarks" ${busy ? "disabled" : ""}>Run physics checks</button><button data-ray="save-scene" ${busy ? "disabled" : ""}>Save scene</button><button data-ray="export-scene" ${busy ? "disabled" : ""}>Export scene JSON</button></div><div class="ray-layout"><section class="instrument-controls"><fieldset ${busy ? "disabled" : ""}><legend>Scene</legend><label>Name<input data-scene-name value="${esc(scene.name)}" maxlength="200"></label><div class="runbook-fields">${Object.entries(
       {
         rays: "Rays per source",
         seed: "Scattering seed",
@@ -340,6 +341,11 @@ export function createNonsequentialWorkspace({
     }
     if (job) return;
     try {
+      if (a === "imaging") {
+        if (!run) throw Error("Trace rays first.");
+        if (onImaging) await onImaging(run);
+        return;
+      }
       if (a === "study") {
         await trace("study");
         return;
