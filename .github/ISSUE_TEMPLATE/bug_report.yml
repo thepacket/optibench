@@ -1,0 +1,42 @@
+name: Bug report
+description: Report a reproducible interface or simulation problem.
+title: "[Bug]: "
+body:
+  - type: markdown
+    attributes:
+      value: "Reports are public. Remove confidential measurements and personal information before attaching files. For questions and ideas, use Discussions."
+  - type: input
+    id: workspace
+    attributes:
+      label: Affected workspace
+      placeholder: "For example: Bench, Coherent bench, Measure, First lab"
+    validations:
+      required: true
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Steps to reproduce
+      description: Include a minimal setup and relevant parameters, or paste the app's downloaded problem report.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected result
+      description: For physics discrepancies, include units and the reference equation or source.
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual result
+      description: Include any displayed error, warning or relevant screenshot.
+    validations:
+      required: true
+  - type: input
+    id: environment
+    attributes:
+      label: Browser, operating system and app source
+      placeholder: "For example: Firefox on Windows, hosted app or local commit"
+    validations:
+      required: true

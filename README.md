@@ -6,7 +6,19 @@ A free, experimental browser-based virtual photonics lab for exploring optical s
 
 This is a small public experiment, with automated model checks and no independent laboratory validation. Instrument outputs are simulated unless measurement data is explicitly imported. Projects and experiments are stored locally in the browser; download backups before clearing browser data.
 
+## Community and license
+
+OptiBench is open source under the [MIT License](LICENSE).
+
+- [Report a bug](https://github.com/thepacket/optibench/issues/new?template=bug_report.yml), including reproducible steps and the affected workspace.
+- [Ask a question or discuss an idea](https://github.com/thepacket/optibench/discussions).
+- Read [contribution guidance](CONTRIBUTING.md), [model validation](docs/VALIDATION.md) and [third-party notices](THIRD_PARTY_NOTICES.md).
+
+This is a small, experimental project; responses and future development depend on available time. Do not post confidential measurements or personal data in public issues or discussions.
+
 ## Run and validate
+
+Use Node.js 22 or later, npm, and Python 3 (for the local static server).
 
 ```sh
 npm ci
@@ -15,7 +27,11 @@ npm run check
 npm start
 ```
 
-Open the local server at `http://localhost:5173`. Runtime code has no npm dependencies. `happy-dom` and `prettier` are development tools only. Hosted output is the authored `dist/` directory; `.openai/hosting.json` preserves the existing Sites project.
+Open the local server at `http://localhost:5173`. Runtime code has no npm dependencies. `happy-dom`, `fake-indexeddb` and `prettier` are development tools only. Hosted output is the authored `dist/` directory; `.openai/hosting.json` preserves the existing Sites project.
+
+### Host your own copy
+
+Serve the contents of `dist/` with a static web server over HTTP or HTTPS; there is no build step or application backend. The included `.openai/hosting.json` identifies the original hosted project. It is not needed by ordinary static hosts; use your own project configuration if deploying through Sites. The npm `private` flag prevents accidental npm publishing and does not restrict the MIT license or public source access.
 
 ## Alignment workflow
 
@@ -30,6 +46,18 @@ Choose **Measure** in the app rail. Import a single spatial-carrier image or fou
 Runs are stored locally in IndexedDB. Export run JSON for portable backup; it contains all decoded signal/calibration samples, settings, the associated bench snapshot and results. Pixel maps export as CSV and reports as printable standalone HTML. Keep original camera files separately. The app provides analysis, not hardware acquisition or a calibrated uncertainty certificate.
 
 ## Included capabilities
+
+The workspaces use distinct models; they are not interchangeable. In addition to the original bench tools below, OptiBench includes:
+
+- **First lab, Experiment and Practice:** guided Michelson experiments, simulated instruments and alignment exercises.
+- **Measure:** imported-frame phase reconstruction, reference subtraction, repeatability, uncertainty studies and portable experiment archives.
+- **Power meter and beam profiler:** instrument response, polarization scans, camera profiles and measurement workflows.
+- **Runbook and Optimize:** repeatable experiment sequences and bounded measured-alignment studies.
+- **Ray optics:** 3D non-sequential geometrical tracing, polarized Fresnel interfaces, supported coatings/scattering models and power accounting; detector powers do not form coherent fringes.
+- **Imaging:** spot, wavefront, Zernike, PSF and MTF analysis using explicit scene/pupil models.
+- **Coherent bench:** sampled fields through supported coplanar folded paths, thin lenses and apertures, with camera acquisition and four-step phase measurement.
+
+### Optical table and original solvers
 
 - 293 inventory entries: 154 sourced manufacturer references and 139 parametric design entries. Manufacturer families include Thorlabs, Edmund Optics and Newport. Source links, lookup date, legacy status and assumptions travel with the catalog.
 - Metric or imperial optical-table hole patterns, arbitrary X/Y placement, optical-normal rotation, adjustable mounting envelopes, hole-center or incremental snapping, locking, multiple selection, pan, zoom, rulers and numerical placement.
@@ -58,7 +86,7 @@ Runs are stored locally in IndexedDB. Export run JSON for portable backup; it co
 
 ## Engineering scope
 
-This is a laboratory planning and first-order optical modeling tool, not a qualified physical-assembly or lens-prescription solver. It does not certify damage thresholds, mount fit or experimental safety. Catalog records are reference data, not a live availability/price feed. Reference EFLs are modeled at ideal principal planes; source BFL values are metadata. Surface prescriptions, wavelength-dependent glass dispersion and coatings, thick-lens aberrations, vector wave fields and out-of-plane geometry are not implemented.
+This is a laboratory planning and first-order optical modeling tool, not a qualified physical-assembly or lens-prescription solver. It does not certify damage thresholds, mount fit or experimental safety. Catalog records are reference data, not a live availability/price feed. Reference EFLs are modeled at ideal principal planes; source BFL values are metadata. The original table solvers use ideal thin optics. The separate Ray optics workspace supports explicit surface models, XYZ geometry and a bounded set of material dispersion, coating and scattering models. It does not infer commercial prescriptions from catalog focal lengths. Coherent bench remains coplanar; full-vector electromagnetic propagation, CAD mechanics and resonant cavities are outside its scope. See the workspace-specific sections below for supported models and exclusions.
 
 See [model validation](docs/VALIDATION.md) for verified cases and numerical limitations. The same limitations and model references are available in the app's Guide and inspector.
 
