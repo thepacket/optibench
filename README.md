@@ -247,3 +247,34 @@ Saved local scans and JSON exports retain per-angle bench snapshots, raw meter
 samples, seeds, settings, zero calibration and fit diagnostics; CSV exports retain
 angles, measured powers, overload flags and seeds. This initial workflow supports
 one source and one analyzer on a straight path; HWP scans require one 180° plate.
+
+### Camera beam profiling
+
+Open **Profile** and choose a bench camera, or use **Load focused-beam example**.
+Acquire a native-pixel central ROI with shot, dark and read noise, full-well clipping
+and ADC quantization. Exposure is local to the acquisition; the camera's other
+instrument parameters come from its bench settings. An averaged shutter-closed
+background is recorded automatically at matching settings. The measured border
+provides residual offset correction, and signed pixel values are retained for
+second moments to avoid positive bias from clipping negative noise.
+
+The profiler reports centroid, horizontal/vertical D4σ diameters, principal-axis
+diameters, minor/major ellipticity and orientation (withheld for nearly circular
+beams). Integrated X/Y Gaussian fits and residual plots are diagnostic. Saturation,
+ROI truncation, poor sampling, large fit residuals and inconsistent widths make a
+frame ineligible for propagation fitting. This is not an ISO-certified instrument.
+Beam-radius definitions: https://www.rp-photonics.com/beam_radius.html
+
+A detector-position scan moves a frozen camera along its normal in one free-space
+segment, acquiring independent frames at 7–21 positions. It fits measured radius
+squared versus travel to estimate waist radius, waist location and divergence
+half-angle. Fits require at least seven valid profiles, a bracketed waist, enough
+width variation and acceptable residuals. No M² certification is claimed. Current
+acquisition models circular Gaussian beams through straight-path lenses, filters
+and polarization optics; it does not propagate aperture diffraction or coherent
+multi-path fields. Scan ROIs are limited to 256 pixels; single frames support 512.
+
+Saved browser-local records retain signal frames, averaged dark frames, background
+seeds, camera settings, per-position bench snapshots and diagnostics. Complete JSON
+and profile/scan CSV exports are available. Opening saved records does not modify
+the live bench. Measurements are distinct from the autoscaled image display.

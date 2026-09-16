@@ -1,3 +1,4 @@
+import { createProfilerWorkspace } from './beam-profiler-ui.js';
 import { createPowerWorkspace } from "./power-meter-ui.js";
 import { createInstrumentWorkspace } from "./instrument-ui.js";
 import { bindWorkspaceLayout } from "./workspace-layout.js";
@@ -214,6 +215,7 @@ function mount() {
       ["first-experiment", "play", "First lab"],
       ["instrument-lab", "grid", "Experiment"],
       ["power-meter", "chart", "Power"],
+      ["beam-profiler", "chart", "Profile"],
       ["alignment-practice", "target", "Practice"],
       ["templates", "book", "Setups"],
       ["design", "bolt", "Design"],
@@ -1514,6 +1516,9 @@ function handleClick(e) {
     case "alignment-practice":
       practiceWorkspace.open();
       break;
+    case "beam-profiler":
+      profilerWorkspace.open();
+      break;
     case "power-meter":
       powerWorkspace.open();
       break;
@@ -2451,6 +2456,7 @@ const simulationWorkspace = createSimulationWorkspace({
   onImport: (records) => measurementWorkspace.importSimulationRuns(records),
 });
 const practiceWorkspace = createPracticeWorkspace({onBench: p => {checkpoint(); setProject(p);}});
+const profilerWorkspace = createProfilerWorkspace({getProject:()=>structuredClone(project),getDetector:()=>activeDetector,onDetector:id=>{activeDetector=id;renderResults();},onBench:p=>{checkpoint();setProject(p);}});
 const powerWorkspace = createPowerWorkspace({getProject:()=>structuredClone(project),getDetector:()=>activeDetector,onDetector:id=>{activeDetector=id;renderResults();}});
 const instrumentWorkspace = createInstrumentWorkspace({
   getProject: () => structuredClone(project),
