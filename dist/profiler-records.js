@@ -118,6 +118,7 @@ function frameRecord(r) {
   const tr = trace(project),
     hit = tr.detectors.filter((h) => h.id === camera.id),
     warnings = tr.warnings.map((w) => w.text);
+  let invalidModel = false;
   if (
     hit.length !== 1 ||
     project.items.filter((c) => c.enabled && c.type === "source").length !==
@@ -138,10 +139,12 @@ function frameRecord(r) {
     ) ||
     tr.warnings.some((w) => w.level === "error") ||
     hit.some((h) => Math.abs(h.incidence) > 5)
-  )
+  ) {
+    invalidModel = true;
     warnings.push(
       "Imported bench is outside the supported single-beam acquisition model.",
     );
+  }
   if (hit[0])
     for (const encounter of tr.hits.filter((h) =>
       hit[0].path.some((c) => c.id === h.id),
@@ -150,10 +153,12 @@ function frameRecord(r) {
       if (
         c.type === "lens" &&
         encounter.radius * 3 > (c.aperture || c.diameter) / 2
-      )
+      ) {
+        invalidModel = true;
         warnings.push("A lens aperture may truncate the beam.");
+      }
     }
-  if (analysis && warnings.length) analysis.valid = false;
+  if (analysis && invalidModel) analysis.valid = false;
   return {
     ...h,
     project,

@@ -1,3 +1,4 @@
+import { createRunbookWorkspace } from './runbook-ui.js';
 import { createProfilerWorkspace } from './beam-profiler-ui.js';
 import { createPowerWorkspace } from "./power-meter-ui.js";
 import { createInstrumentWorkspace } from "./instrument-ui.js";
@@ -216,6 +217,7 @@ function mount() {
       ["instrument-lab", "grid", "Experiment"],
       ["power-meter", "chart", "Power"],
       ["beam-profiler", "chart", "Profile"],
+      ["runbook", "book", "Runbook"],
       ["alignment-practice", "target", "Practice"],
       ["templates", "book", "Setups"],
       ["design", "bolt", "Design"],
@@ -1516,6 +1518,9 @@ function handleClick(e) {
     case "alignment-practice":
       practiceWorkspace.open();
       break;
+    case "runbook":
+      runbookWorkspace.open();
+      break;
     case "beam-profiler":
       profilerWorkspace.open();
       break;
@@ -2456,6 +2461,7 @@ const simulationWorkspace = createSimulationWorkspace({
   onImport: (records) => measurementWorkspace.importSimulationRuns(records),
 });
 const practiceWorkspace = createPracticeWorkspace({onBench: p => {checkpoint(); setProject(p);}});
+const runbookWorkspace = createRunbookWorkspace({getProject:()=>structuredClone(project),onInspect:(kind,r)=>kind==="camera"?profilerWorkspace.openRecord(r):powerWorkspace.openRecord(r)});
 const profilerWorkspace = createProfilerWorkspace({getProject:()=>structuredClone(project),getDetector:()=>activeDetector,onDetector:id=>{activeDetector=id;renderResults();},onBench:p=>{checkpoint();setProject(p);}});
 const powerWorkspace = createPowerWorkspace({getProject:()=>structuredClone(project),getDetector:()=>activeDetector,onDetector:id=>{activeDetector=id;renderResults();}});
 const instrumentWorkspace = createInstrumentWorkspace({

@@ -1,4 +1,5 @@
 const ids = [
+  "runbook-workspace",
   "profiler-workspace",
   "power-workspace",
   "instrument-workspace",

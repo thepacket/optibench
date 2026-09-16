@@ -317,3 +317,49 @@ the live bench. Measurements are distinct from the autoscaled image display.
 
 All data remains browser-local until the user exports a file. Single-frame ROIs
 can be 512 pixels; repeatability and propagation scans are capped at 256 pixels.
+
+### Experiment Runbook (next eight iterations)
+
+Open **Runbook** in the app rail. Start with **Camera procedure example** or
+**Power procedure example**, or capture the current bench as a procedure snapshot.
+The live optical bench is never modified by execution.
+
+1. **Saved procedures:** Name and annotate ordered camera/power steps, set repeats,
+   select detector settings, and save immutable procedure revisions. Restore a
+   recorded run's own procedure for reproduction. Explicit seeds make noise
+   reproducible; New noise seed creates a separate realization.
+2. **Preflight:** Checks supported detector paths, camera geometry, ROI bounds,
+   source/model compatibility, every planned sweep value and browser resource
+   limits. Failed preflight blocks execution. There are at most 12 steps, 40
+   acquisitions and two million stored camera signal/background pixel values.
+3. **Cancellable execution:** Runs in a worker with a 120-second deadline. Records
+   every completed acquisition and an execution log. Cancellation retains completed
+   data and discards the interrupted acquisition; late worker results cannot
+   overwrite the retained partial run. Individual readings open in Power/Profile.
+4. **Parameter sweeps:** Sweep supported lens/camera/power-head positions,
+   waveplate/analyzer axes, source power or the selected camera exposure. Repeats
+   occur at each point. Every point starts from an independent bench copy.
+5. **Measured acceptance:** Inclusive limits apply to camera diameter, sensor
+   centroid, ellipticity or indicated optical power. Decisions never use simulator
+   truth. Invalid profiles/overloads are inconclusive, acquisition failures remain
+   errors, and missing limits are measured but not passed. Stop-on-failure also
+   stops on inconclusive/error outcomes, preserving the triggering measurement.
+6. **Run comparison:** Matches acquisition positions/repeats only when bench,
+   procedure settings and limits agree. Shows numerical differences and decision
+   changes. Identical seeds are explicitly identified as non-independent data;
+   incomplete runs compare only their common retained acquisitions.
+7. **Validated portable backups:** JSON exports retain procedure snapshots, seeds,
+   frames, averaged backgrounds, raw meter samples and zero acquisitions. Imports
+   up to 64 MB verify planned order, geometry, conditions and seeds, then recompute
+   camera fits, meter indications, zero corrections and acceptance decisions.
+   Imported logs are reconstructed, IDs are new, and physical provenance is not
+   authenticated. Imports do not overwrite existing saved records.
+8. **Reports:** Measured sweep plots, CSV result tables and standalone printable
+   HTML reports include limits, outcomes, diagnostics, settings, acquisition
+   provenance, execution logs and optional comparisons. CSV text fields are
+   protected against formula interpretation. Keep complete JSON for raw data.
+
+Runbook execution inherits the existing instrument-model limits. It models fixed
+snapshots and independent seeded instrument noise, not hardware automation,
+mechanical hysteresis or temporal drift. A passing procedure is a statement about
+its simulated measured values and specified limits, not hardware certification.

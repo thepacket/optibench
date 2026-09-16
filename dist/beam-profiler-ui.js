@@ -496,6 +496,16 @@ export function createProfilerWorkspace({
     }
   }
   return {
+    async openRecord(r) {
+      if (r?.format !== "optibench-beam-profile")
+        throw Error("Choose a recorded camera profile.");
+      await this.open();
+      record = structuredClone(r);
+      selectedFrame = 0;
+      comparison = null;
+      message = "Recorded Runbook acquisition opened; live bench unchanged.";
+      render();
+    },
     async open() {
       if (!root) {
         root = document.createElement("section");
