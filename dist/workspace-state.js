@@ -1,4 +1,5 @@
 const ids = [
+  "nonsequential-workspace",
   "optimization-workspace",
   "runbook-workspace",
   "profiler-workspace",

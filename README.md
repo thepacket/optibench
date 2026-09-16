@@ -379,3 +379,34 @@ Open **Optimize**, or **Runbook → Alignment procedures**, to run bounded local
 - **Create Runbook verification procedure** turns the verified candidate into fresh measured acceptance steps. Camera axes are checked separately (centering uses a conservative per-axis tolerance); power must exceed the fresh baseline mean. The live bench is not changed by this handoff.
 
 Limits: 3–48 search evaluations, 1–3 readings per search evaluation, 3–8 verification readings per condition, at most 60 readings plus meter zeros, two million stored camera pixel values, and a 120-second UI execution deadline. Cancellation retains finished evaluations and cannot enable Apply. Camera optimization inherits the single-source straight Gaussian-path profiler model. Instrument noise is simulated and does not include hardware drift or calibration uncertainty. The examples demonstrate centering, diameter and power optimization without lab equipment.
+
+
+## Non-sequential geometrical optics
+
+Open **Ray optics → Plate ghosts → Trace rays**. **Run physics checks** runs eight numerical reference checks inside the app.
+
+The new solver is separate from Gaussian propagation and coherent interferometry. It implements true XYZ rays, nearest positive surface intersections, arbitrary repeated encounters, reflected/transmitted branching, and explicit medium tracking. Finite rectangular dielectric plates have all six faces; spheres have exact spherical boundaries; symmetric biconvex lenses use two spherical caps and a refracting cylindrical rim. Ideal planar mirrors, splitters, opaque stops and absorbing detectors complete the initial surface library.
+
+Polarization uses global complex transverse field vectors with flux-normalized Fresnel amplitudes. The two orthogonal incoherent modes of an unpolarized source are transported separately. Total internal reflection retains the different complex s/p phases. Optical path lengths accumulate refractive index times geometric distance. Detector branches add **power**, not coherent amplitude: this solver does not produce interference fringes.
+
+The material list includes nominal SCHOTT N-BK7 Sellmeier dispersion, a nondispersive n=1.5 reference, and unit-index ambient, with a supported 400–1100 nm band. Sources sample a collimated spatial Gaussian distribution, normalized after a 3-waist truncation; they do not include diffraction or angular divergence. A zero spatial waist is a pencil ray. Add sources at different wavelengths for independent spectral ray bundles.
+
+### Results and persistence
+
+- Oblique, top and front projections show the actual XYZ intersections. Select a path sequence to highlight it; reflected paths use a distinct color.
+- Detector bins contain incident power and irradiance in mW/mm². The map uses a square-root display scale; detector CSV is linear. Detectors are ideal two-sided absorbers, without camera electronics, exposure or measurement noise.
+- Terminal accounting separates detected, absorbed, escaped, below-threshold, encounter-limited, segment-limited and cancelled power. Unresolved power is never called physical absorption. The residual exposes numerical closure error. Per-object accounting includes every encounter and can therefore exceed launched power in reflecting paths.
+- Filter detected paths by detector, visited component and exact reflection count. Sequence selection distinguishes direct transmission and internal-reflection ghost candidates. Intentional mirror paths also have reflections; a reflection count alone does not establish an unwanted ghost image.
+- Save scenes/runs locally, export/import scene JSON, export full ray-audit JSON, and export detector/path CSV. Full run JSON is an audit export; restore its scene and recompute rather than trusting imported derived power totals.
+
+### Bench integration and current limits
+
+**Capture bench** creates a separate scene snapshot. It maps sources, ideal mirrors/splitters, stops and detectors. Mechanical bodies are explicitly excluded. Catalog lenses and unsupported optics are marked **Needs explicit surface model** and block tracing until the user specifies a supported prescription or removes them from the study. Selecting a parametric lens does not infer a manufacturer's radii, thickness, glass or coatings from focal length. The main bench and existing solvers are unchanged.
+
+Dielectric bounding boxes must be disjoint; nested, touching or overlapping media are rejected. Coincident nearest surfaces are rejected as ambiguous. Glass is lossless and isotropic; no melt/temperature corrections, bulk absorption, thin-film stacks, scattering, CAD, anisotropic refraction, diffraction or interference is modeled. Sources must begin outside glass. Defaults and ceilings bound the ray tree: at most eight sources, 64 objects, 2048 rays/source, 64 encounters and 100,000 segments. The UI deadline is 120 seconds. Cancellation retains the previous completed run, not a partial result with a misleading power balance. The view shows at most 3000 segments; accounting and exports use all retained rays. Increase ray density and vary detector binning before interpreting fine irradiance structure.
+
+### Reference checks
+
+The automated checks cover Snell refraction, Brewster suppression, TIR magnitude and phase, transverse field transport, unpolarized averaging, SCHOTT reference indices, the plate's geometric reflection series and first forward ghost, tilted-plate lateral displacement, thick-lens/ball-lens paraxial focus, 3D rotational invariance, optical path length, finite rims/edges, energy budgets, malformed scenes, path filtering and UI persistence/cancellation.
+
+Material coefficients and reference indices: [SCHOTT Optical Glass Datasheets, N-BK7](https://media.schott.com/api/public/content/820eba3413cc4e788433a3751f8edba9?download=true&v=97b3ea2b), page 13. Interface equations: [RP Photonics Encyclopedia — Fresnel Equations, Rüdiger Paschotta](https://www.rp-photonics.com/fresnel_equations.html). Nominal refractive indices are used against unit-index ambient; this is not a calibrated environmental-index model.
