@@ -278,3 +278,42 @@ Saved browser-local records retain signal frames, averaged dark frames, backgrou
 seeds, camera settings, per-position bench snapshots and diagnostics. Complete JSON
 and profile/scan CSV exports are available. Opening saved records does not modify
 the live bench. Measurements are distinct from the autoscaled image display.
+
+### Camera laboratory workflow (eight follow-up iterations)
+
+1. **Automatic exposure:** Find exposure & acquire uses observed camera peak and
+   saturation indicators, targets 60% of the usable ADC/full-well range, and retains
+   all trials. Eight trials and 0.001–10000 ms bounds prevent unbounded searches.
+   It does not use the simulator's ideal irradiance to select exposure.
+2. **Movable ROI:** X/Y offsets select integer-pixel regions within the physical
+   sensor. Center ROI on recorded beam uses the measured centroid; ROI-relative
+   and sensor-relative centroids are displayed separately. The bench stays fixed.
+3. **Repeatability:** Acquire 3, 5 or 10 independent signal/background pairs at
+   fixed conditions. Valid frames yield sample means, sample SDs and standard
+   errors; flagged frames remain in the record but are excluded from statistics.
+4. **Fit uncertainty:** Propagation fits include approximate 95% t intervals from
+   residual coefficient covariance and first-order propagation. They assume
+   independent equal-variance errors in radius squared; calibration, drift,
+   alignment and model bias are not included. These are not accuracy guarantees.
+   Method references: [NIST least squares](https://www.itl.nist.gov/div898/handbook/pmd/section4/pmd431.htm)
+   and [uncertainty propagation](https://www.nist.gov/pml/nist-technical-note-1297/nist-tn-1297-appendix-law-propagation-uncertainty).
+5. **Validated JSON import:** Accepts profiler frames, scans and repeatability
+   records up to 64 MB. Checks pixels, dimensions, instrument metadata, scan travel
+   and snapshot consistency. Recomputes measurements from recorded pixels and
+   discards supplied fits. Imports receive new IDs and retain a source ID; they do
+   not overwrite existing records or authenticate a file's physical provenance.
+6. **Saved-run comparison:** Compare the selected saved baseline with the current
+   record of the same kind. Shows absolute/relative differences and changed
+   acquisition conditions. Waist positions are not compared across different
+   reference camera origins. Differences are not statistical significance tests.
+7. **Printable reports:** Export a standalone HTML report with recorded conditions,
+   bench components, selected image, measured profiles, diagnostics, repeatability
+   or propagation results, approximate intervals and optional comparison. Open the
+   report in a browser to print/save as PDF; retain complete JSON for raw pixels.
+8. **Record management:** Add names and notes, view approximate serialized storage
+   sizes, move saved records to reversible Trash, restore, export backups, or
+   permanently delete a selected trashed record with explicit confirmation.
+   Keeping a record open in memory does not keep its saved copy after deletion.
+
+All data remains browser-local until the user exports a file. Single-frame ROIs
+can be 512 pixels; repeatability and propagation scans are capped at 256 pixels.

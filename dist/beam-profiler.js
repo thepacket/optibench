@@ -1,3 +1,4 @@
+import { propagationUncertainty } from "./profiler-statistics.js";
 import { validateProject, makeProject } from "./project.js";
 import { trace } from "./optics.js";
 import { cameraResponse } from "./wave.js";
@@ -194,7 +195,15 @@ export function analyzeBeamFrame(frame, dark, pixelUm) {
 }
 export function acquireBeamProfile(
   project,
-  { detectorId, n = 256, exposure, seed = 1, backgroundFrames = 8 } = {},
+  {
+    detectorId,
+    n = 256,
+    exposure,
+    seed = 1,
+    backgroundFrames = 8,
+    roiX = 0,
+    roiY = 0,
+  } = {},
 ) {
   if (
     ![64, 128, 256, 512].includes(n) ||
@@ -249,10 +258,19 @@ export function acquireBeamProfile(
   const hit = hits[0];
   if (Math.abs(hit.incidence) > 5)
     throw Error("Orient the camera within 5° of normal incidence.");
-  const originX = Math.floor((camera.pixelsX - n) / 2),
-    originY = Math.floor((camera.pixelsY - n) / 2),
+  const originX = Math.floor((camera.pixelsX - n) / 2) + roiX,
+    originY = Math.floor((camera.pixelsY - n) / 2) + roiY,
     pitch = camera.pixelPitch / 1000,
     width = n * pitch;
+  if (
+    !Number.isInteger(roiX) ||
+    !Number.isInteger(roiY) ||
+    originX < 0 ||
+    originY < 0 ||
+    originX + n > camera.pixelsX ||
+    originY + n > camera.pixelsY
+  )
+    throw Error("ROI offsets must be integer pixels inside the camera sensor.");
   const offsetX = (originX + (n - camera.pixelsX) / 2) * pitch,
     offsetY = (originY + (n - camera.pixelsY) / 2) * pitch;
   const power = new Float64Array(n * n),
@@ -292,6 +310,8 @@ export function acquireBeamProfile(
     analysisError = null;
   try {
     analysis = analyzeBeamFrame(frame, dark, camera.pixelPitch);
+    analysis.sensorCentroidXmm = analysis.centroidXmm + offsetX;
+    analysis.sensorCentroidYmm = analysis.centroidYmm + offsetY;
   } catch (e) {
     analysisError = e.message;
   }
@@ -317,7 +337,14 @@ export function acquireBeamProfile(
     project: p,
     detectorId,
     camera: { ...camera },
-    settings: { n, seed, backgroundFrames, exposure: camera.exposure },
+    settings: {
+      n,
+      seed,
+      backgroundFrames,
+      exposure: camera.exposure,
+      roiX,
+      roiY,
+    },
     roi: {
       originX,
       originY,
@@ -335,7 +362,7 @@ export function acquireBeamProfile(
     analysisError,
     warnings,
     model:
-      "Simulated native-pixel central ROI. Circular Gaussian pixel-centre irradiance, shot/dark/read noise, full-well clipping and ADC. Averaged shutter-closed backgrounds plus measured border-offset correction; signed second moments. D4σ diameters; Gaussian fits are diagnostic. No hardware calibration or ISO compliance claim.",
+      "Simulated native-pixel selected ROI. Circular Gaussian pixel-centre irradiance, shot/dark/read noise, full-well clipping and ADC. Averaged shutter-closed backgrounds plus measured border-offset correction; signed second moments. D4σ diameters; Gaussian fits are diagnostic. No hardware calibration or ISO compliance claim.",
   };
 }
 function solve3(rows) {
@@ -407,6 +434,7 @@ export function fitBeamPropagation(points, axis) {
     rmsRadiusSquaredMm2: rms,
     valid: valid.length,
     excluded: points.length - valid.length,
+    uncertainty: propagationUncertainty(rows, [a, b, c], scale, mid),
     coefficients: [a, b, c],
     mid,
     scale,
@@ -463,7 +491,7 @@ export function scanBeamProfile(
     referencePath = path;
     const record = acquireBeamProfile(q, {
       ...settings,
-      seed: (settings.seed || 1) + i * 32,
+      seed: (settings.seed ?? 1) + i * 32,
     });
     points.push({ positionMm, record });
     progress(`${i + 1}/${count} camera positions`);
@@ -493,7 +521,7 @@ export function scanBeamProfile(
   };
 }
 export const profilerStore = {
-  access(value) {
+  access(value, remove = false) {
     return new Promise((resolve, reject) => {
       const r = indexedDB.open("optibench-beam-profiler", 1);
       r.onupgradeneeded = () =>
@@ -502,9 +530,11 @@ export const profilerStore = {
       r.onsuccess = () => {
         const db = r.result,
           tx = db.transaction("records", value ? "readwrite" : "readonly"),
-          req = value
-            ? tx.objectStore("records").put(value)
-            : tx.objectStore("records").getAll();
+          req = remove
+            ? tx.objectStore("records").delete(value)
+            : value
+              ? tx.objectStore("records").put(value)
+              : tx.objectStore("records").getAll();
         tx.oncomplete = () => {
           db.close();
           resolve(req.result);
@@ -521,5 +551,10 @@ export const profilerStore = {
   },
   list() {
     return this.access();
+  },
+  remove(id) {
+    if (typeof id !== "string" || !id)
+      throw Error("Choose a saved record to delete.");
+    return this.access(id, true);
   },
 };
