@@ -229,3 +229,21 @@ Uniform Jones states propagate through straight Gaussian/ray paths and the strai
 Advanced polarization (elliptical sources, waveplates, nonideal polarizers) is explicitly unsupported at mirrors/splitters and in the coherent interferometry workspace. Existing ideal linear-polarizer interferometry retains its prior scalar model. The Experiment workspace remains a four-phase interferometry instrument; use the main detector tray for straight-path camera images and Power for measured transmission.
 
 Background: [Thorlabs waveplate tutorial](https://www.thorlabs.com/newgrouppage9.cfm?objectgroup_id=7234&tabname=Tutorial). Analytical tests check lossless-retarder power conservation, half-wave rotation, quarter-wave circularity, ellipticity, finite extinction, camera/power response and explicit folded-path rejection. These tests establish the stated ideal model, not commercial waveplate performance.
+
+### Polarization angle measurements
+
+Load **Waveplates & analyzer**, open **Power**, and use **Polarization angle scan**.
+Choose the half-wave plate or analyzer, angle range and reading count. Scans use
+frozen copies of the active bench and current meter settings. Close the internal
+shutter and acquire a zero, then reopen it before scanning to enable an extinction
+ratio estimate when the minimum is resolved. Scans run in a cancellable worker.
+
+The measured curve is fitted to a constant plus cosine/sine at four times the
+half-wave plate angle or twice the analyzer angle. Reported axis is the angle of
+maximum transmission modulo 90° or 180°, respectively. Fits use quantized acquired
+readings, never simulator truth. Extinction is a whole-system estimate and is
+suppressed without zero calibration, a resolved minimum, or acceptable residuals.
+Saved local scans and JSON exports retain per-angle bench snapshots, raw meter
+samples, seeds, settings, zero calibration and fit diagnostics; CSV exports retain
+angles, measured powers, overload flags and seeds. This initial workflow supports
+one source and one analyzer on a straight path; HWP scans require one 180° plate.
