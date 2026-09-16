@@ -1,6 +1,10 @@
 # OptiBench
 
-A browser-based optical laboratory layout and first-order simulation application. The working surface is a physical-coordinate optical table rather than a page of controls.
+A free, experimental browser-based virtual photonics lab for exploring optical setups, interference, diffraction and simulated measurements.
+
+**[Open OptiBench](https://optibench-lab.apacket.chatgpt.site/)** and choose **First lab** for a guided Michelson experiment. No account or laboratory equipment is required. Click the OptiBench brand for getting-started help, model limits and a downloadable problem report.
+
+This is a small public experiment, with automated model checks and no independent laboratory validation. Instrument outputs are simulated unless measurement data is explicitly imported. Projects and experiments are stored locally in the browser; download backups before clearing browser data.
 
 ## Run and validate
 
@@ -11,7 +15,7 @@ npm run check
 npm start
 ```
 
-Open the local server at `http://localhost:5173`. Runtime code has no npm dependencies. `happy-dom` and `prettier` are development tools only. Hosted output is the authored `dist/` directory; `.openai/hosting.json` preserves the existing private Sites project.
+Open the local server at `http://localhost:5173`. Runtime code has no npm dependencies. `happy-dom` and `prettier` are development tools only. Hosted output is the authored `dist/` directory; `.openai/hosting.json` preserves the existing Sites project.
 
 ## Alignment workflow
 

@@ -381,3 +381,17 @@ test('waveplate setup exposes source ellipticity, axis, retardance and extinctio
  change('[data-field="leakage"]',.001);
  assert.equal(read().project.items.find(c=>c.id===3).leakage,.001);
 });
+
+test("launch guidance opens the first lab without leaving a blocking dialog", () => {
+  click('[data-action="about"]');
+  assert.ok(el("#dialog").open);
+  click('#dialog-body [data-action="first-experiment"]');
+  assert.equal(el("#dialog").open, false);
+  assert.ok(el('[data-guide="close"]'));
+  click('[data-guide="close"]');
+  click('[data-action="about"]');
+  click('#dialog-body [data-action="problem-report"]');
+  assert.ok(el("#problem-details"));
+  assert.match(el("#dialog-body").textContent, /No report is sent automatically/);
+  closeDialog();
+});
