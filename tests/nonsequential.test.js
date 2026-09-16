@@ -360,7 +360,7 @@ test("ray workspace captures unsupported bench, traces examples, filters, saves,
 import { runRayBenchmarks } from "../dist/nonsequential-benchmarks.js";
 test("in-app physics checks publish numerical references and pass the declared tolerances", () => {
   const rows = runRayBenchmarks();
-  assert.equal(rows.length, 8);
+  assert.equal(rows.length, 12);
   assert.ok(
     rows.every((r) => r.pass && Number.isFinite(r.expected) && r.tolerance > 0),
   );

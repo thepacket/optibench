@@ -383,7 +383,7 @@ Limits: 3–48 search evaluations, 1–3 readings per search evaluation, 3–8 v
 
 ## Non-sequential geometrical optics
 
-Open **Ray optics → Plate ghosts → Trace rays**. **Run physics checks** runs eight numerical reference checks inside the app.
+Open **Ray optics → Plate ghosts → Trace rays**. **Run physics checks** runs twelve numerical reference checks inside the app.
 
 The new solver is separate from Gaussian propagation and coherent interferometry. It implements true XYZ rays, nearest positive surface intersections, arbitrary repeated encounters, reflected/transmitted branching, and explicit medium tracking. Finite rectangular dielectric plates have all six faces; spheres have exact spherical boundaries; symmetric biconvex lenses use two spherical caps and a refracting cylindrical rim. Ideal planar mirrors, splitters, opaque stops and absorbing detectors complete the initial surface library.
 
@@ -395,7 +395,7 @@ The material list includes nominal SCHOTT N-BK7 Sellmeier dispersion, a nondispe
 
 - Oblique, top and front projections show the actual XYZ intersections. Select a path sequence to highlight it; reflected paths use a distinct color.
 - Detector bins contain incident power and irradiance in mW/mm². The map uses a square-root display scale; detector CSV is linear. Detectors are ideal two-sided absorbers, without camera electronics, exposure or measurement noise.
-- Terminal accounting separates detected, absorbed, escaped, below-threshold, encounter-limited, segment-limited and cancelled power. Unresolved power is never called physical absorption. The residual exposes numerical closure error. Per-object accounting includes every encounter and can therefore exceed launched power in reflecting paths.
+- Terminal accounting separates detected, surface-absorbed, bulk-absorbed, escaped, below-threshold, encounter-limited, segment-limited and cancelled power. Unresolved power is never called physical absorption. The residual exposes numerical closure error. Per-object accounting includes every encounter and can therefore exceed launched power in reflecting paths.
 - Filter detected paths by detector, visited component and exact reflection count. Sequence selection distinguishes direct transmission and internal-reflection ghost candidates. Intentional mirror paths also have reflections; a reflection count alone does not establish an unwanted ghost image.
 - Save scenes/runs locally, export/import scene JSON, export full ray-audit JSON, and export detector/path CSV. Full run JSON is an audit export; restore its scene and recompute rather than trusting imported derived power totals.
 
@@ -403,10 +403,30 @@ The material list includes nominal SCHOTT N-BK7 Sellmeier dispersion, a nondispe
 
 **Capture bench** creates a separate scene snapshot. It maps sources, ideal mirrors/splitters, stops and detectors. Mechanical bodies are explicitly excluded. Catalog lenses and unsupported optics are marked **Needs explicit surface model** and block tracing until the user specifies a supported prescription or removes them from the study. Selecting a parametric lens does not infer a manufacturer's radii, thickness, glass or coatings from focal length. The main bench and existing solvers are unchanged.
 
-Dielectric bounding boxes must be disjoint; nested, touching or overlapping media are rejected. Coincident nearest surfaces are rejected as ambiguous. Glass is lossless and isotropic; no melt/temperature corrections, bulk absorption, thin-film stacks, scattering, CAD, anisotropic refraction, diffraction or interference is modeled. Sources must begin outside glass. Defaults and ceilings bound the ray tree: at most eight sources, 64 objects, 2048 rays/source, 64 encounters and 100,000 segments. The UI deadline is 120 seconds. Cancellation retains the previous completed run, not a partial result with a misleading power balance. The view shows at most 3000 segments; accounting and exports use all retained rays. Increase ray density and vary detector binning before interpreting fine irradiance structure.
+Dielectric bounding boxes must be disjoint; nested, touching or overlapping media are rejected. Coincident nearest surfaces are rejected as ambiguous. Glass is isotropic with optional intensity attenuation. There are no melt/temperature corrections, absorbing or metallic films, measured BSDFs, volume scattering, CAD, anisotropic refraction, diffraction or whole-bench interference. Sources must begin outside glass. Defaults and ceilings bound the ray tree: at most eight sources, 64 objects, 2048 rays/source, 64 encounters and 100,000 segments. The UI deadline is 120 seconds. Cancellation retains the previous completed run, not a partial result with a misleading power balance. The view shows at most 3000 segments; accounting and exports use all retained rays. Increase ray density and vary detector binning before interpreting fine irradiance structure.
 
 ### Reference checks
 
 The automated checks cover Snell refraction, Brewster suppression, TIR magnitude and phase, transverse field transport, unpolarized averaging, SCHOTT reference indices, the plate's geometric reflection series and first forward ghost, tilted-plate lateral displacement, thick-lens/ball-lens paraxial focus, 3D rotational invariance, optical path length, finite rims/edges, energy budgets, malformed scenes, path filtering and UI persistence/cancellation.
 
 Material coefficients and reference indices: [SCHOTT Optical Glass Datasheets, N-BK7](https://media.schott.com/api/public/content/820eba3413cc4e788433a3751f8edba9?download=true&v=97b3ea2b), page 13. Interface equations: [RP Photonics Encyclopedia — Fresnel Equations, Rüdiger Paschotta](https://www.rp-photonics.com/fresnel_equations.html). Nominal refractive indices are used against unit-index ambient; this is not a calibrated environmental-index model.
+
+
+## Expanded ray physics and optical studies
+
+Open **Ray optics** and choose **AR coating**, **Absorbing glass**, or **Diffuse reflector**. These examples run independently of the main bench and require no lab equipment.
+
+1. **Custom materials:** Add 2–64 wavelength/index/attenuation rows with a name and provenance. Linear interpolation stays inside the supplied wavelength band; extrapolation is rejected. Up to 16 custom materials are stored with the scene. These data are user supplied, not certified vendor prescriptions.
+2. **Bulk attenuation:** Beer–Lambert intensity loss uses the traveled distance inside each volume, including repeated internal reflections. Material-table attenuation and additional object attenuation add in inverse millimeters. The audit separates bulk loss from surface loss and numerical cutoffs. This phenomenological model does not modify Fresnel interfaces with a complex index.
+3. **Multilayer coatings:** Up to 12 real-index, nondispersive dielectric layers retain complex s/p reflection and transmission amplitudes, angle dependence, polarization and interference within the film stack. The computation supports evanescent layers and reverses the layer sequence for exiting rays. Traced branches still add incoherent power at detectors.
+4. **Coating editor and presets:** Edit layer index/thickness, choose optical faces or every boundary, and apply an ideal quarter-wave AR or four-pair reflector at 550 nm. Presets are illustrative designs, not commercial coating claims. One stack applies to all selected faces of a body.
+5. **Diffuse reflection:** An ideal, depolarizing Lambertian reflector uses cosine-weighted hemisphere sampling and a recorded seed. Albedo controls reflected power; the remainder is surface absorption. This is not a measured scattering model or rough dielectric interface.
+6. **Path analysis:** Select all, scattered-only, or unscattered paths. Each sequence reports scatter events alongside specular reflections. Direct, specular and scattered detector-power categories are mutually exclusive; a scattered path may also include specular encounters.
+7. **Optical studies:** Sweep one source wavelength or one object's absolute yaw. All points are validated before execution. Plots/tables retain detector power, efficiency, power categories and unresolved fraction. Save/reopen studies locally, restore inputs, and export JSON or CSV. JSON contains scene, settings and summary maps, not every ray tree. Limits: 2–15 points and a combined permitted budget of 500,000 segments.
+8. **Convergence:** Compare 3–6 increasing ray counts using detector power and normalized irradiance-map L1 change. Both final refinements must meet the chosen tolerance, with unresolved power below 0.001% at the last three levels. Zero signal, errors and interrupted studies are inconclusive. Stability is a numerical diagnostic, not a confidence interval or an accuracy guarantee; vary seeds and binning as well.
+
+Studies share the 120-second UI deadline. Cancellation preserves completed points and ignores late worker results; an unfinished point is discarded. Current numerical ceilings remain 2048 rays per source and 128 × 128 detector bins, so some diffuse maps will correctly remain unresolved.
+
+Validation includes independent quarter-wave admittance formulas, oblique flux conservation and reciprocity, zero-thickness Fresnel limits, evanescent-film tunneling, Beer–Lambert geometric-series transmission, cosine-distribution moments, analytical Lambertian cone collection, study preflight, persistence and cancellation.
+
+References: [Byrnes, Multilayer optical calculations](https://arxiv.org/abs/1603.02720), [PBRT, Diffuse Reflection](https://www.pbr-book.org/4ed/Reflection_Models/Diffuse_Reflection), and [RP Photonics, Beer–Lambert Law](https://www.rp-photonics.com/beer_lambert_law.html).

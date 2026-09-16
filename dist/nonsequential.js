@@ -1,4 +1,11 @@
 import {
+  validateCoating,
+  coatedBranches,
+  coatingApplies,
+  coatingPreset,
+} from "./ray3-coatings.js";
+import { seededScatter, lambertianBranch } from "./ray3-scattering.js";
+import {
   EPS,
   add,
   sub,
@@ -19,9 +26,14 @@ import {
   interfaceBranches,
   idealBranches,
 } from "./ray3-fresnel.js";
-import { indexAt, rayMaterials } from "./ray3-materials.js";
+import {
+  indexAt,
+  rayMaterials,
+  validateCustomMaterials,
+  materialValue,
+} from "./ray3-materials.js";
 import { validateProject } from "./project.js";
-export const RAY_ENGINE = "nonsequential-1.0";
+export const RAY_ENGINE = "nonsequential-1.1";
 export const rayKinds = {
   plate: "Dielectric rectangular plate",
   sphere: "Dielectric sphere",
@@ -29,6 +41,7 @@ export const rayKinds = {
   mirror: "Ideal planar mirror",
   splitter: "Ideal planar splitter",
   absorber: "Opaque stop",
+  diffuse: "Lambertian reflector",
   detector: "Absorbing detector",
   unsupported: "Needs explicit surface model",
 };
@@ -47,6 +60,10 @@ export function newRayObject(kind = "plate", id = crypto.randomUUID()) {
     thickness: 5,
     aperture: 20,
     material: "N-BK7",
+    bulkAlpha: 0,
+    coating: [],
+    coatingFaces: "optical",
+    albedo: 0.8,
     reflectivity: kind === "splitter" ? 0.5 : 1,
     transmission: kind === "splitter" ? 0.5 : 0,
   };
@@ -72,8 +89,10 @@ export function newRayScene() {
       },
     ],
     objects: [],
+    materials: [],
     options: {
       rays: 128,
+      seed: 42,
       maxDepth: 16,
       maxSegments: 30000,
       minPowerFraction: 1e-7,
@@ -221,6 +240,7 @@ export function validateRayScene(input) {
   )
     throw Error("Use a named non-sequential scene.");
   const s = clone(input);
+  s.materials = validateCustomMaterials(s.materials);
   s.notes ??= [];
   if (
     !Array.isArray(s.notes) ||
@@ -272,7 +292,18 @@ export function validateRayScene(input) {
     bounded(o.height, 0.001, 6000, "Height");
     if (!["disc", "rectangle"].includes(o.shape))
       throw Error("Choose a disc or rectangle.");
-    if (volume(o)) indexAt(o.material, 633);
+    o.bulkAlpha ??= 0;
+    o.coating = validateCoating(o.coating);
+    o.coatingFaces ??= "optical";
+    if (!["optical", "all"].includes(o.coatingFaces))
+      throw Error("Choose optical faces or all faces for coatings.");
+    bounded(o.bulkAlpha, 0, 100, "Additional bulk attenuation per mm");
+    if (!volume(o) && (o.bulkAlpha > 0 || o.coating.length))
+      throw Error("Coatings and bulk attenuation require a dielectric volume.");
+    if (volume(o))
+      for (const src of s.sources)
+        materialValue(o.material, src.wavelength, s.materials);
+    if (o.kind === "diffuse") bounded(o.albedo, 0, 1, "Diffuse albedo");
     if (["sphere", "lens"].includes(o.kind))
       bounded(o.radius, 0.01, 10000, "Surface radius");
     if (["plate", "lens"].includes(o.kind))
@@ -316,7 +347,9 @@ export function validateRayScene(input) {
       if (inside(a.position, o, -EPS))
         throw Error("Launch sources outside dielectric volumes.");
   const q = s.options;
+  if (q) q.seed ??= 42;
   if (!q) throw Error("Missing trace options.");
+  bounded(q.seed, 0, 2147483647, "Scattering seed", true);
   bounded(q.rays, 1, 2048, "Rays per source", true);
   bounded(q.maxDepth, 1, 64, "Encounter limit", true);
   bounded(q.maxSegments, 100, 100000, "Segment budget", true);
@@ -368,11 +401,13 @@ export function traceNonsequential(
 ) {
   const scene = validateRayScene(input),
     queue = launchRays(scene),
+    random = seededScatter(scene.options.seed),
     initialPower = scene.sources.reduce((s, a) => s + a.power, 0),
     ledger = {
       launched: initialPower,
       detected: 0,
       absorbed: 0,
+      bulkAbsorbed: 0,
       escaped: 0,
       threshold: 0,
       depthLimit: 0,
@@ -412,8 +447,8 @@ export function traceNonsequential(
       queue.length = 0;
       break;
     }
-    const ray = queue.pop(),
-      power = fieldPower(ray.fields);
+    const ray = queue.pop();
+    let power = fieldPower(ray.fields);
     if (power <= 0) continue;
     if (power < ray.rootPower * scene.options.minPowerFraction) {
       end(ray, "threshold");
@@ -436,9 +471,39 @@ export function traceNonsequential(
       current = ray.medium
         ? scene.objects.find((o) => o.id === ray.medium).material
         : "ambient",
-      n1 = indexAt(current, ray.wavelength),
+      properties = materialValue(current, ray.wavelength, scene.materials),
+      n1 = properties.n,
       opl = ray.opl + hit.distance * n1;
+    const inputPower = power;
+    if (ray.medium) {
+      const body = scene.objects.find((o) => o.id === ray.medium),
+        alpha = properties.alpha + body.bulkAlpha,
+        distanceMm = hit.distance + (ray.offset || 0),
+        fraction = Math.exp(-alpha * distanceMm),
+        loss = power * (1 - fraction);
+      if (loss > 0) {
+        end(
+          {
+            ...ray,
+            opl,
+            path: [
+              ...ray.path,
+              { objectId: ray.medium, surface: "bulk", event: "B" },
+            ],
+          },
+          "bulkAbsorbed",
+          loss,
+        );
+        surfaceStats[ray.medium].bulkAbsorbed =
+          (surfaceStats[ray.medium].bulkAbsorbed || 0) + loss;
+        ray.fields = ray.fields.map((f) =>
+          f.map((c) => c.map((v) => v * Math.sqrt(fraction))),
+        );
+        power = fieldPower(ray.fields);
+      }
+    }
     segments.push({
+      inputPower,
       a: ray.origin,
       b: hit.point,
       power,
@@ -450,6 +515,8 @@ export function traceNonsequential(
     const stats = (surfaceStats[o.id] ??= {
       incident: 0,
       reflected: 0,
+      scattered: 0,
+      bulkAbsorbed: 0,
       transmitted: 0,
       absorbed: 0,
       detected: 0,
@@ -506,6 +573,7 @@ export function traceNonsequential(
       continue;
     }
     let branches;
+    if (power === 0) continue;
     if (volume(o)) {
       if (ray.medium && ray.medium !== o.id)
         throw Error("Ambiguous dielectric transition. Separate volumes.");
@@ -517,18 +585,42 @@ export function traceNonsequential(
         throw Error(
           "Dielectric side disagrees with ray medium. Avoid tangencies and coincident surfaces.",
         );
-      const n2 = indexAt(exiting ? "ambient" : o.material, ray.wavelength);
-      branches = interfaceBranches(
-        ray.direction,
-        hit.normal,
-        ray.fields,
-        n1,
-        n2,
+      const n2 = materialValue(
+        exiting ? "ambient" : o.material,
+        ray.wavelength,
+        scene.materials,
+      ).n;
+      branches = (
+        coatingApplies(o, hit.face)
+          ? coatedBranches(
+              ray.direction,
+              hit.normal,
+              ray.fields,
+              n1,
+              n2,
+              ray.wavelength,
+              o.coating,
+              exiting,
+            )
+          : interfaceBranches(ray.direction, hit.normal, ray.fields, n1, n2)
       ).map((b) => ({
         ...b,
         medium: b.event === "T" ? (exiting ? null : o.id) : ray.medium,
       }));
-    } else
+    } else if (o.kind === "diffuse")
+      branches = [
+        {
+          ...lambertianBranch(
+            ray.direction,
+            hit.normal,
+            ray.fields,
+            o.albedo,
+            random,
+          ),
+          medium: ray.medium,
+        },
+      ];
+    else
       branches = idealBranches(
         ray.direction,
         hit.normal,
@@ -555,11 +647,18 @@ export function traceNonsequential(
     }
     for (const branch of branches) {
       const p = fieldPower(branch.fields);
-      stats[branch.event === "T" ? "transmitted" : "reflected"] += p;
+      stats[
+        branch.event === "T"
+          ? "transmitted"
+          : branch.event === "S"
+            ? "scattered"
+            : "reflected"
+      ] += p;
       queue.push({
         ...ray,
         ...branch,
         origin: add(hit.point, scale(branch.direction, EPS * 4)),
+        offset: EPS * 4,
         depth: ray.depth + 1,
         path: [
           ...ray.path,
@@ -569,12 +668,13 @@ export function traceNonsequential(
           opl +
           EPS *
             4 *
-            indexAt(
+            materialValue(
               branch.medium
                 ? scene.objects.find((x) => x.id === branch.medium).material
                 : "ambient",
               ray.wavelength,
-            ),
+              scene.materials,
+            ).n,
       });
     }
     if (segments.length % 256 === 0)
@@ -609,18 +709,26 @@ export function pathKey(path) {
 }
 export function groupDetectorPaths(
   run,
-  { detectorId = "", contains = "", reflections = null } = {},
+  {
+    detectorId = "",
+    contains = "",
+    reflections = null,
+    scattering = "all",
+  } = {},
 ) {
   const groups = new Map();
   for (const h of run.detectorHits) {
     const count = h.path.filter(
         (p) => p.event === "R" || p.event === "TIR",
       ).length,
-      key = pathKey(h.path);
+      key = pathKey(h.path),
+      scatterCount = h.path.filter((p) => p.event === "S").length;
     if (
       (detectorId && h.detectorId !== detectorId) ||
       (contains && !h.path.some((p) => p.objectId === contains)) ||
-      (reflections !== null && count !== reflections)
+      (reflections !== null && count !== reflections) ||
+      (scattering === "only" && scatterCount === 0) ||
+      (scattering === "exclude" && scatterCount > 0)
     )
       continue;
     const k = `${h.sourceId}|${h.wavelength}|${key}`,
@@ -631,6 +739,7 @@ export function groupDetectorPaths(
         wavelength: h.wavelength,
         detectorId: h.detectorId,
         reflections: count,
+        scatterCount,
         power: 0,
         hits: 0,
       };
@@ -645,5 +754,50 @@ export function parseRayScene(text) {
     throw Error("Scene imports are limited to 2 MB.");
   const s = validateRayScene(JSON.parse(text));
   s.id = crypto.randomUUID();
+  return s;
+}
+
+export function expandedRayExample(kind) {
+  const s = rayExample("plate");
+  s.objects[0].normal = [1, 0, 0];
+  s.sources[0].wavelength = 550;
+  if (kind === "coated") {
+    s.name = "Ideal AR coated plate";
+    s.objects[0].coating = coatingPreset("ar", indexAt("N-BK7", 550));
+  }
+  if (kind === "absorption") {
+    s.name = "Absorbing plate · user data";
+    s.materials = [
+      {
+        id: "custom-absorber",
+        name: "Illustrative absorbing glass",
+        provenance: "Assumed demonstration data; not a vendor material",
+        samples: [
+          [400, 1.5, 0.05],
+          [550, 1.5, 0.1],
+          [1100, 1.5, 0.2],
+        ],
+      },
+    ];
+    s.objects[0].material = "custom-absorber";
+  }
+  if (kind === "diffuse") {
+    s.name = "Lambertian reflector · collection aperture";
+    const o = s.objects[0];
+    o.kind = "diffuse";
+    o.center = [500, 450, 100];
+    o.width = 40;
+    o.height = 40;
+    o.albedo = 0.8;
+    s.sources[0].position = [450, 450, 100];
+    s.sources[0].waist = 0;
+    s.options.rays = 1024;
+    s.objects = s.objects.filter((o) => o.id !== "detector");
+    const d = s.objects.find((o) => o.id === "return");
+    d.center = [400, 450, 100];
+    d.width = 200;
+    d.height = 200;
+    d.shape = "disc";
+  }
   return s;
 }
