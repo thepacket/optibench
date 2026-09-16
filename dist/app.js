@@ -1,3 +1,4 @@
+import { createCoherentBenchWorkspace } from './coherent-bench-ui.js';
 import { createImagingWorkspace } from './imaging-ui.js';
 import { createNonsequentialWorkspace } from './nonsequential-ui.js';
 import { createOptimizationWorkspace } from './optimization-ui.js';
@@ -225,6 +226,7 @@ function mount() {
       ["optimize", "settings", "Optimize"],
       ["nonsequential", "grid", "Ray optics"],
       ["imaging", "grid", "Imaging"],
+      ["coherent-bench", "grid", "Coherent bench"],
       ["alignment-practice", "target", "Practice"],
       ["templates", "book", "Setups"],
       ["design", "bolt", "Design"],
@@ -1525,6 +1527,9 @@ function handleClick(e) {
     case "alignment-practice":
       practiceWorkspace.open();
       break;
+    case "coherent-bench":
+      coherentBenchWorkspace.open();
+      break;
     case "imaging":
       imagingWorkspace.open();
       break;
@@ -2631,3 +2636,5 @@ if (document.modelContext?.registerTool) {
     } catch {}
   window.addEventListener("pagehide", () => lifecycle.abort(), { once: true });
 }
+
+const coherentBenchWorkspace = createCoherentBenchWorkspace({getProject:()=>structuredClone(project),onMeasure:r=>measurementWorkspace.openRecord(r)});

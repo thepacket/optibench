@@ -1,4 +1,5 @@
 const ids = [
+  "coherent-bench-workspace",
   "imaging-workspace",
   "nonsequential-workspace",
   "optimization-workspace",
