@@ -363,3 +363,19 @@ Runbook execution inherits the existing instrument-model limits. It models fixed
 snapshots and independent seeded instrument noise, not hardware automation,
 mechanical hysteresis or temporal drift. A passing procedure is a statement about
 its simulated measured values and specified limits, not hardware certification.
+
+
+## Measured alignment and optimization
+
+Open **Optimize**, or **Runbook → Alignment procedures**, to run bounded local optimization on frozen bench snapshots:
+
+- Center a beam on the camera, reach a target D4σ diameter on both axes, or maximize indicated power.
+- Select up to three unlocked component parameters (supported translations, source/mirror angles or polarization axes). Set absolute travel bounds and a search resolution. Bounds must include the starting value and respect table/stage geometry.
+- Choose fixed camera exposure, native ROI and background averaging, or meter wavelength/range/averaging. Every meter reading receives a fresh shutter-closed zero. Scores use noisy measured values; invalid profiles, saturation, overload and unsupported optical paths are rejected.
+- The coordinate search tests positive and negative steps, reducing steps when no improvement is found. It stops at resolution, evaluation budget or cancellation. It does not guarantee a global optimum.
+- Fresh interleaved baseline/candidate readings report mean, sample SD and SEM. Apply is enabled only when measured loss improves by more than twice the combined SEM. This screening rule is not a confidence interval or a hardware accuracy claim. Target tolerance is reported separately from improvement.
+- **Apply verified alignment** changes only the selected parameters, checks that the live bench still matches the recorded snapshot, and uses the existing Undo history. Examples run on copies; **Load procedure bench** explicitly loads an example before applying its result.
+- Save/replay alignment procedures and runs in the existing local Runbook database. Export/import procedure JSON; export complete raw-data run JSON and a printable HTML report. Run JSON is an audit export, not an importable trusted measurement record.
+- **Create Runbook verification procedure** turns the verified candidate into fresh measured acceptance steps. Camera axes are checked separately (centering uses a conservative per-axis tolerance); power must exceed the fresh baseline mean. The live bench is not changed by this handoff.
+
+Limits: 3–48 search evaluations, 1–3 readings per search evaluation, 3–8 verification readings per condition, at most 60 readings plus meter zeros, two million stored camera pixel values, and a 120-second UI execution deadline. Cancellation retains finished evaluations and cannot enable Apply. Camera optimization inherits the single-source straight Gaussian-path profiler model. Instrument noise is simulated and does not include hardware drift or calibration uncertainty. The examples demonstrate centering, diameter and power optimization without lab equipment.

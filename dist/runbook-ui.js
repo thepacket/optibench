@@ -93,6 +93,7 @@ export function createRunbookWorkspace({
   store = runbookStore,
   execute,
   onInspect,
+  onAlignment,
 } = {}) {
   let root,
     recipe,
@@ -104,7 +105,7 @@ export function createRunbookWorkspace({
     comparison = null;
   function render() {
     if (!root) return;
-    root.innerHTML = `<header class="measurement-header"><button data-runbook="close" ${job ? "disabled" : ""}>← Optical bench</button><h1>Experiment Runbook</h1><span>Simulated procedures</span></header><main class="instrument-main"><p role="status">${esc(message)}</p><div class="measurement-buttons"><button data-runbook="capture" ${job ? "disabled" : ""}>Capture live bench</button><button data-runbook="camera-example" ${job ? "disabled" : ""}>Camera procedure example</button><button data-runbook="power-example" ${job ? "disabled" : ""}>Power procedure example</button></div><p>Procedure bench: ${esc(recipe.project.title)}. Execution uses this snapshot; the live bench is unchanged.</p><div class="runbook-layout"><section class="instrument-controls"><fieldset ${job ? "disabled" : ""}><legend>Procedure</legend><label>Name<input data-recipe="name" value="${esc(recipe.name)}" maxlength="200" required></label><label>Notes<textarea rows="2" data-recipe="notes" maxlength="10000">${esc(recipe.notes)}</textarea></label><label>Reproducible noise seed<input type="number" data-recipe="seed" value="${recipe.seed}" step="1" min="0" max="2147000000" required></label><label><input type="checkbox" data-recipe="stopOnFailure" ${recipe.stopOnFailure ? "checked" : ""}>Stop on a failed or inconclusive acquisition</label>${recipe.steps.map((s, i) => stepEditor(s, i, recipe.project)).join("")}<div class="measurement-buttons"><button data-runbook="add-camera">Add camera step</button><button data-runbook="add-power">Add power step</button><button data-runbook="new-seed">New noise seed</button></div></fieldset><div class="measurement-buttons"><button data-runbook="preflight" ${job ? "disabled" : ""}>Preflight procedure</button><button data-runbook="run" ${job ? "disabled" : ""}>Run procedure</button>${job ? '<button data-runbook="cancel">Cancel · retain completed data</button>' : ""}<button data-runbook="save-recipe" ${job ? "disabled" : ""}>Save procedure revision</button><button data-runbook="export-recipe" ${job ? "disabled" : ""}>Export procedure JSON</button></div>${check ? `<div class="instrument-${check.ok ? "truth" : "warning"}"><h3>Preflight ${check.ok ? "ready" : "blocked"}</h3><p>${check.acquisitions} acquisitions · ${check.pixelValues.toLocaleString()} stored camera pixel values</p>${[...check.errors, ...check.warnings].map((m) => `<p>${esc(m)}</p>`).join("")}</div>` : ""}<h3>Saved procedures</h3><label>Import procedure or run JSON<input data-runbook-import type="file" accept=".json,application/json" ${job ? "disabled" : ""}></label><select data-saved-recipe><option value="">Choose procedure</option>${history
+    root.innerHTML = `<header class="measurement-header"><button data-runbook="close" ${job ? "disabled" : ""}>← Optical bench</button><h1>Experiment Runbook</h1><span>Simulated procedures</span></header><main class="instrument-main"><p role="status">${esc(message)}</p><div class="measurement-buttons"><button data-runbook="capture" ${job ? "disabled" : ""}>Capture live bench</button><button data-runbook="alignment" ${job ? "disabled" : ""}>Alignment procedures</button><button data-runbook="camera-example" ${job ? "disabled" : ""}>Camera procedure example</button><button data-runbook="power-example" ${job ? "disabled" : ""}>Power procedure example</button></div><p>Procedure bench: ${esc(recipe.project.title)}. Execution uses this snapshot; the live bench is unchanged.</p><div class="runbook-layout"><section class="instrument-controls"><fieldset ${job ? "disabled" : ""}><legend>Procedure</legend><label>Name<input data-recipe="name" value="${esc(recipe.name)}" maxlength="200" required></label><label>Notes<textarea rows="2" data-recipe="notes" maxlength="10000">${esc(recipe.notes)}</textarea></label><label>Reproducible noise seed<input type="number" data-recipe="seed" value="${recipe.seed}" step="1" min="0" max="2147000000" required></label><label><input type="checkbox" data-recipe="stopOnFailure" ${recipe.stopOnFailure ? "checked" : ""}>Stop on a failed or inconclusive acquisition</label>${recipe.steps.map((s, i) => stepEditor(s, i, recipe.project)).join("")}<div class="measurement-buttons"><button data-runbook="add-camera">Add camera step</button><button data-runbook="add-power">Add power step</button><button data-runbook="new-seed">New noise seed</button></div></fieldset><div class="measurement-buttons"><button data-runbook="preflight" ${job ? "disabled" : ""}>Preflight procedure</button><button data-runbook="run" ${job ? "disabled" : ""}>Run procedure</button>${job ? '<button data-runbook="cancel">Cancel · retain completed data</button>' : ""}<button data-runbook="save-recipe" ${job ? "disabled" : ""}>Save procedure revision</button><button data-runbook="export-recipe" ${job ? "disabled" : ""}>Export procedure JSON</button></div>${check ? `<div class="instrument-${check.ok ? "truth" : "warning"}"><h3>Preflight ${check.ok ? "ready" : "blocked"}</h3><p>${check.acquisitions} acquisitions · ${check.pixelValues.toLocaleString()} stored camera pixel values</p>${[...check.errors, ...check.warnings].map((m) => `<p>${esc(m)}</p>`).join("")}</div>` : ""}<h3>Saved procedures</h3><label>Import procedure or run JSON<input data-runbook-import type="file" accept=".json,application/json" ${job ? "disabled" : ""}></label><select data-saved-recipe><option value="">Choose procedure</option>${history
       .filter((r) => r.format === "optibench-runbook")
       .map(
         (r) =>
@@ -261,6 +262,7 @@ export function createRunbookWorkspace({
     }
   }
   async function action(a, id) {
+    if (a === "alignment" && !job) { onAlignment?.(recipe.project); return; }
     if (a === "cancel") {
       cancel();
       return;
@@ -410,7 +412,7 @@ export function createRunbookWorkspace({
     }
   }
   return {
-    async open() {
+    async open(input) {
       if (!root) {
         recipe = createRunbook(getProject());
         root = document.createElement("section");
@@ -502,6 +504,7 @@ export function createRunbookWorkspace({
           render();
         };
       }
+      if (input) { recipe = validateRunbook(input); check = null; }
       showWorkspace(root);
       render();
       try {
