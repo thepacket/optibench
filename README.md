@@ -1,5 +1,7 @@
 # OptiBench
 
+![OptiBench virtual optical bench showing a Michelson interferometer, component inventory and simulated detector fringes](docs/optibench-hero.png)
+
 A free, experimental browser-based virtual photonics lab for exploring optical setups, interference, diffraction and simulated measurements.
 
 **[Open OptiBench](https://optibench-lab.apacket.chatgpt.site/)** and choose **First lab** for a guided Michelson experiment. No account or laboratory equipment is required. Click the OptiBench brand for getting-started help, model limits and a downloadable problem report.
